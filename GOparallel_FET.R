@@ -1,16 +1,14 @@
-## Preload WGCNA standard pipeline R ression's data to memory, if desired (example shown here)
+## Preload WGCNA standard pipeline R ression's data to memory, if desired (example minimal RData given here)
 ## otherwise below code runs as a step late in the Seyfried systems biology pipeline,
 ## or following the pipeline's volcano code block, or with .csv input formatted as simple lists
 ## in columns, or the .csv may be kME table output from the global network plots pipeline.
 ###############################################################################################
-rootdir="Q:/MEGATMT/Sample/"
-outputfigs<-outputtabs<-rootdir
-setwd(rootdir)
-load("../PipelineSample-MEGATMT-NatNeurosci2022.RData")  #Sample pipeline outputs required to run as inputs type 2 or 3.
-rootdir="Q:/MEGATMT/Sample/"
-outputfigs<-outputtabs<-rootdir
 
+## Sample pipeline outputs required to run as inputs for input scenario #2 below  -- contains empty cleanDat (only ordered rownames matching net$colors are needed here)
+load("./PipelineSample-MEGATMT-WGCNA-NatNeurosci2022.RData")
 
+## Sample pipeline outputs required to run as inputs for input scenario #3 below
+load("./PipelineSample-MEGATMT-ANOVA+Volcano-NatNeurosci2022.RData")
 
 
 ###################################################################################################################################
@@ -687,5 +685,5 @@ dev.off()
 } # end if (cocluster) 
 
 
-setwd(rootdir)
+setwd(filePath)
 #save.image(paste0("saved.image.GSA.GO.FET-",outFilename,"-completed.Rdata"))
