@@ -82,8 +82,9 @@ GOparallel <- function(dummyVar,env=.GlobalEnv) {
 	##1a. Organize input gene lists, of the significant up and down (p<0.05) proteins in the current cleanDat
 	### List building from ANOVA-defined categories ###
 	if (ANOVAgroups) {
-	  sigThresh=0.05;
-	
+	  if (!exists("sigThresh")) if(exists("sigVolcCutoff")) { sigThresh=sigVolcCutoff } else { sigThresh=0.05 }
+	  print(paste0("...Applying a minimum p value cutoff of ",sigThresh," for ANOVA lists..."))
+
 	  #colnames(ANOVAout)
 	  #********************
 	  ##This code relies on a pre-existing data frame ANOVAout already in the environment, processed through volcano output for selected pairwise comparisons of interest.
@@ -91,7 +92,13 @@ GOparallel <- function(dummyVar,env=.GlobalEnv) {
 	  #********************
 	
 	  ANOVAout$Symbol <- do.call("rbind", strsplit(as.character(rownames(ANOVAout)), "[|]"))[, 1]
-	
+
+	  if (!exists("FCmin")) FCmin=0
+	  cutoff=log2(1+FCmin)
+	  # shows what your cutoff for log2(FC) calculates as
+	  print(paste0("...Applying a ", FCmin*100,"% minimum fold change threshold at + and - x=", signif(cutoff,2),"..."))
+
+
 	  DEXlistsForGO<-list()
 	  iter=0
 	  for (i in testIndexMasterList) {
@@ -99,13 +106,13 @@ GOparallel <- function(dummyVar,env=.GlobalEnv) {
 	    j=paste0(gsub(" ",".",comparisonIDs$Comparison[iter]),".down")
 	    k=paste0(gsub(" ",".",comparisonIDs$Comparison[iter]),".up")
 	    if (length(intersect(i,flip))==1) {
-	      #flipped sign (all diffs >0 for down)
-	      DEXlistsForGO[[j]]<-ANOVAout$Symbol[which(ANOVAout[,i]<sigThresh & ANOVAout[,i+numComp]>0)]
-	      DEXlistsForGO[[k]]<-ANOVAout$Symbol[which(ANOVAout[,i]<sigThresh & ANOVAout[,i+numComp]<0)]
+	      #flipped sign (all diffs >cutoff for down)
+	      DEXlistsForGO[[j]]<-ANOVAout$Symbol[which(ANOVAout[,i]<sigThresh & ANOVAout[,i+numComp]> cutoff)]
+	      DEXlistsForGO[[k]]<-ANOVAout$Symbol[which(ANOVAout[,i]<sigThresh & ANOVAout[,i+numComp]< -cutoff)]
 	    } else {
-	      #do not flip sign (all diffs <0 for down)
-	      DEXlistsForGO[[j]]<-ANOVAout$Symbol[which(ANOVAout[,i]<sigThresh & ANOVAout[,i+numComp]<0)]
-	      DEXlistsForGO[[k]]<-ANOVAout$Symbol[which(ANOVAout[,i]<sigThresh & ANOVAout[,i+numComp]>0)]
+	      #do not flip sign (all diffs < -cutoff for down)
+	      DEXlistsForGO[[j]]<-ANOVAout$Symbol[which(ANOVAout[,i]<sigThresh & ANOVAout[,i+numComp]< -cutoff )]
+	      DEXlistsForGO[[k]]<-ANOVAout$Symbol[which(ANOVAout[,i]<sigThresh & ANOVAout[,i+numComp]> cutoff)]
 	    }
 	  }
 	
@@ -593,15 +600,22 @@ GOparallel <- function(dummyVar,env=.GlobalEnv) {
 	bw<-colorRampPalette(c("#0058CC", "white"))
 	wr<-colorRampPalette(c("white", "#CC3300"))
 	colvec<-c(bw(50),wr(50))
-	
-	heatmapLegendColors<-list(Modules=sort(uniquemodcolors))
-	
+
+	if(!modulesInMemory) {
+	  uniquemodcolors=labels2colors(1:(ncol(GSA.FET.collapsed.outSimple.Zscore)-2))  #variable reused for color annotation here; meaningless for non-WGCNA lists
+	  myRowAnnotation=data.frame(Lists=names(GSA.FET.outSimple)[order(uniquemodcolors)])
+	  heatmapLegendColors<-list(Lists=sort(uniquemodcolors))
+	} else {
+	  heatmapLegendColors<-list(Modules=sort(uniquemodcolors))
+	  myRowAnnotation=data.frame(Modules=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
+	}
+
 	require(NMF,quietly=TRUE) #for aheatmap
 	pdf(file=paste0("GO_cc_clustering_from_GSA_FET_Z-",filenameFinal,".pdf"),width=18.5,height=18,onefile=FALSE)
 	  aheatmap(x=data, ## Numeric Matrix
 	         main="Co-clustering with manhattan distance function, ward metric",
 	#         annCol=metdat,  ## Color swatch and legend annotation of columns/samples and rows (not used)
-	         annRow=data.frame(Modules=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors)))),
+	         annRow=myRowAnnotation,
 	         annColors=heatmapLegendColors,
 	         border=list(matrix = TRUE),
 	         scale="none",  ## row, column, or none
