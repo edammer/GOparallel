@@ -357,7 +357,7 @@ GOparallel <- function(dummyVar,env=.GlobalEnv) {
 	
 	
 	## Set up parallel backend.
-	library("doParallel")
+	require("doParallel",quietly=TRUE)
 	# stopCluster(clusterLocal)
 	# ##when running at Emory (requires RSA public key-ssh, & manual run of script to start server backend):  
 	# parallelThreads set in configuration section.
@@ -463,7 +463,7 @@ GOparallel <- function(dummyVar,env=.GlobalEnv) {
 	}
 	
 	if (removeRedundantGOterms) {
-		library(ontologyIndex)
+		require(ontologyIndex)
 		ontology.index<-get_OBO(file=GO.OBOfile,extract_tags="everything")
 		#below function minimal_set uses ancestors list to dereplicate; what about using synonyms list from our go.obo as ancestors?
 	}
@@ -589,14 +589,14 @@ GOparallel <- function(dummyVar,env=.GlobalEnv) {
 	data[matrixdata< -4] <- -4
 	 
 	#NMF - initial approach
-	library(WGCNA)
+	require(WGCNA,quietly=TRUE)
 	bw<-colorRampPalette(c("#0058CC", "white"))
 	wr<-colorRampPalette(c("white", "#CC3300"))
 	colvec<-c(bw(50),wr(50))
 	
 	heatmapLegendColors<-list(Modules=sort(uniquemodcolors))
 	
-	library(NMF) #for aheatmap
+	require(NMF,quietly=TRUE) #for aheatmap
 	pdf(file=paste0("GO_cc_clustering_from_GSA_FET_Z-",filenameFinal,".pdf"),width=18.5,height=18,onefile=FALSE)
 	  aheatmap(x=data, ## Numeric Matrix
 	         main="Co-clustering with manhattan distance function, ward metric",
