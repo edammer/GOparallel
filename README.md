@@ -11,6 +11,9 @@ Sample input for WGCNA modules, or ANOVA-Tukey table + volcano settings from pip
 
 Note the current analysis output samples are using June 2022 ontologies, much newer compared to those in the publication, which was based on the GO-Elite Ensembl v62+ database.
 
+Requires R packages: piano, WGCNA, curl, doParallel, rvest, ontologyIndex, NMF.
+
+
 Wrapper code for function GOparallel():
 ```
 ## Preload WGCNA standard pipeline R ression's data to memory, if desired (example minimal RData given here)
@@ -56,7 +59,7 @@ load("./PipelineSample-MEGATMT-ANOVA+Volcano-NatNeurosci2022.RData")
 ##  - Download "[SPECIES]_GO_AllPathways_with_GO_iea_[DATE]_symbol.gmt" from http://download.baderlab.org/EM_Genesets/current_release/
 ##  - (optional) Download go.obo from http://current.geneontology.org/ontology/go.obo
 ##    (Enables removal of redundant terms with option removeRedundantGOterms=TRUE)
-##  - Change parameters between the lines below, and execute with code sub-blocks 1-3 which follow.
+##  - Change parameters between the lines below, and execute GOparallel("") from function in source file GOparallel-FET.R.
 ##
 ##  - Input can be:
 ##    1) a .csv file with uniqueIDs (Symbol|otherID(s)...) or species-appropriate gene symbols in columns.
