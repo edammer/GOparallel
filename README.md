@@ -105,9 +105,10 @@ outputGOeliteInputs=FALSE
 maxBarsPerOntology=5
             #Ontologies per ontology type, used for generating the PDF report; does not limit tabled output
 
-GMTdatabaseFile="c:/BaderLabGO/current.gmt"   #e.g. "Human_GO_AllPathways_with_GO_iea_June_01_2022_symbol.gmt"
-                                              # Current month release will be download if file does not exist.
-            #drive:folder/to/filename of ontology database for the appropriate species (no conversion is performed)
+GMTdatabaseFile="c:/BaderLabGO/current.gmt"   # e.g. "Human_GO_AllPathways_with_GO_iea_June_01_2022_symbol.gmt"
+                                              # Current month release will be downloaded if file does not exist.
+					      # Specify a nonexistent file to always download the current database.
+            #path/to/filename of ontology database for the appropriate species (no conversion is performed)
             #BaderLab website links to their current monthly update of ontologies for Human, Mouse, and Rat, minimally
             #http://download.baderlab.org/EM_Genesets/current_release/
             #For more information, see documentation:  http://baderlab.org/GeneSets
@@ -140,7 +141,6 @@ GO.OBOfile<-"C:/BaderLabGO/go.obo"
 
 cocluster=TRUE
             #If TRUE, output PDF of signed Zscore coclustering on GO:cellular component terms (useful for WGCNA modules)
-	    #Note: Currently fails after bar plot output completes, if symbol lists are not valid R colors (modules)...
 
 ######################## END OF PARAMETER VARIABLES ###################################################################################
 
