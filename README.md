@@ -18,7 +18,7 @@ Note the current analysis output samples in the above linked .zip use June 2022 
     available from the Bader Lab website.
 
 ## INSTRUCTIONS
-  - Download GOparalle-FET.R source, change variables serving as parameters in the wrapper code below and run GOparallel("").
+  - Download GOparallel-FET.R source, change variables serving as parameters in the wrapper code below and run GOparallel("").
 
   - Input can be:
     1) a .csv file with uniqueIDs (Symbol|otherID(s)...) or species-appropriate gene symbols in columns.
