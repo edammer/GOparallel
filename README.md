@@ -18,7 +18,7 @@ Note the current analysis output samples in the above linked .zip use June 2022 
     available from the Bader Lab website.
 
 ## INSTRUCTIONS
-  - Download GOparallel-FET.R source, change variables serving as parameters in the wrapper code below and run GOparallel("").
+  - Download <a href="https://github.com/edammer/GOparallel/raw/main/GOparallel-FET.R">GOparallel-FET.R</a> source, change variables serving as parameters in the wrapper code below and run GOparallel("").
 
   - Input can be:
     1) a .csv file with uniqueIDs (Symbol|otherID(s)...) or species-appropriate gene symbols in columns.
@@ -141,5 +141,5 @@ for any of the available species there. According to <a href="http://baderlab.or
 In interactive sessions run from an R console, needed ontology database download will commence of [SPECIES]_GO_AllPathways_with_GO_iea_[DATE]_symbol.gmt from the BaderLab download website online folder structure after interactive user input to select the species. The interaction is skipped if the .GMT file specified in GMTdatabaseFile variable exists.  Note that repetitive bulk downloads of large files during working hours can trigger a ban of the downloader's IP.
   
 
-If GO redundant term removal is enabled, ontologyIndex package will be loaded and the full go.obo file downloaded if not already present as specified in GO.OBOfile
-from <a href="http://current.geneontology.org/ontology/go.obo">http://current.geneontology.org/ontology/go.obo</a>
+If GO redundant term removal is enabled, ontologyIndex package will be loaded and the full go.obo file downloaded from <a href="http://current.geneontology.org/ontology/go.obo">http://current.geneontology.org/ontology/go.obo</a> if not already present as specified in the GO.OBOfile variable.
+
