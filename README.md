@@ -18,13 +18,13 @@ Note the current analysis output samples in the above linked .zip use June 2022 
     available from the Bader Lab website.
 
 ## INSTRUCTIONS
-  - Change parameters between the lines below, and execute GOparallel("") from function in source file GOparallel-FET.R.
+  - Download GOparalle-FET.R source, change variables serving as parameters in the wrapper code below and run GOparallel("").
 
   - Input can be:
     1) a .csv file with uniqueIDs (Symbol|otherID(s)...) or species-appropriate gene symbols in columns.
        (Each will be considered as a list of DEPs or module members); specify fileName and have below two flags =FALSE.
        alternately, the input can be a WGCNA kME table output from the Seyfried systems pipeline saved as .csv.
-    2) cleanDat, net$colors, and kMEdat from Seyfried systems biology pipeline loaded in memory              (modulesInMemory=TRUE)
+    2) cleanDat, net$colors, and kMEdat variables from Seyfried systems biology pipeline loaded in memory     (modulesInMemory=TRUE)
     3) ANOVA/T-Test statistics table with <a href="https://github.com/edammer/parANOVA">Seyfried volcano code block (plotVolc function)</a> data structures loaded in memory       (ANOVAgroups=TRUE)
 
   - Outputs are:
