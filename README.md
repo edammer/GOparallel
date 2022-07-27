@@ -56,10 +56,11 @@ Wrapper code for function GOparallel():
 dev.off()
 options(stringsAsFactors=FALSE)
 
-## Sample pipeline outputs required to run as inputs for input scenario #2 below  -- contains empty cleanDat (only ordered rownames matching net$colors are needed here)
+## Sample pipeline outputs required to run as inputs when modulesInMemory=TRUE and ANOVAgroups=FALSE below:
+#  -- contains empty cleanDat (only ordered rownames matching net$colors are needed here)
 load("c:/BaderLabGO/PipelineSample-MEGATMT-WGCNA-NatNeurosci2022.RData")
 
-## Sample pipeline outputs required to run as inputs for input scenario #3 below
+## Sample pipeline outputs required to run as inputs when ANOVAgroups=TRUE below:
 load("c:/BaderLabGO/PipelineSample-MEGATMT-ANOVA+Volcano-NatNeurosci2022.RData")
 
 
