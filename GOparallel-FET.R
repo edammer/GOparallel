@@ -1,4 +1,10 @@
-GOparallel <- function(dummyVar,env=.GlobalEnv) {
+###################################################################################################################################
+## One-Step GSA FET (R piano implementation) WITH USER PARAMETERS
+##  - by Eric Dammer, Divya Nandakumar
+## Nicholas Seyfried Lab Bioinformatics - for the lab - 07/27/2022 version 1.01
+###################################################################################################################################
+
+GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	## Clean out spaces and escaped backslashes from folder paths (folder names with spaces should not be used on non-windows systems with this script)
 	#filePath=paste0(paste( sapply(do.call(c,strsplit(filePath,"[/\\]")),function(x) { if (grepl(" ",x)) { gsub(x,paste0(substr(gsub(" ","",x),1,6),"~1"),x) } else { x } } ),collapse="/"),"/")
 	filePath=paste0(paste( sapply(do.call(c,strsplit(filePath,"[/\\]")),function(x) { if (grepl(" ",x)) { gsub(" ","\ ",x) } else { x } } ),collapse="/"),"/")
