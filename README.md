@@ -18,7 +18,7 @@ Note the current analysis output samples in the above linked .zip use June 2022 
     available from the Bader Lab website.
 
 ## INSTRUCTIONS
-  - Download <a href="https://github.com/edammer/GOparallel/raw/main/GOparallel-FET.R">GOparallel-FET.R</a> source, change variables serving as parameters in the wrapper code below and run GOparallel("").
+  - Download <a href="https://github.com/edammer/GOparallel/raw/main/GOparallel-FET.R">GOparallel-FET.R</a> source, change variables serving as parameters in the wrapper code below and run GOparallel().
 
   - Input can be:
     1) a .csv file with uniqueIDs (Symbol|otherID(s)...) or species-appropriate gene symbols in columns.
@@ -126,7 +126,7 @@ cocluster=TRUE
 ######################## END OF PARAMETER VARIABLES ###################################################################################
 
 source("GOparallel-FET.R")
-GOparallel("")  # parameters must be set in global environment as above; no defaults are specified for the function or passed to it.
+GOparallel()  # parameters must be set in global environment as above; no defaults are specified for the function or passed to it.
 
 ```
 ## Other Notes
