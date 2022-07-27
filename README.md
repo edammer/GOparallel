@@ -135,9 +135,9 @@ The piano package (documentation <a href="https://rdrr.io/bioc/piano/">here</a>)
 The function for fisher exact test calculation used within GOparallel is derived from a similar function in the piano package, with its dependencies, but further calculates the p values of both enrichment and depletion so that we have signed Zscores available.
 ##
 .GMT standard tab-separated format databases are downloaded after scraping available file links from http://download.baderlab.org/EM_Genesets/current_release/
-for any of the available species there. According to the site's documentation, the 3 core GO ontology types are updated monthly, and additional curated pathways are collected from various sources, e.g. the Molecular Signatures (MSig) C2 database, Reactome, wikipathways, etc., which are updated less regularly.
+for any of the available species there. According to <a href="http://baderlab.org/GeneSets">the site's documentation</a>, the 3 core GO ontology types are updated monthly, and additional curated pathways are collected from various sources, e.g. the Molecular Signatures (MSig) C2 database, Reactome, wikipathways, etc., which are updated less regularly.
 
-In interactive sessions run from an R console, needed ontology database download will commence of [SPECIES]_GO_AllPathways_with_GO_iea_[DATE]_symbol.gmt from http://download.baderlab.org/EM_Genesets/current_release/ online folder structure after interactive user input to select the species. The interaction is skipped if the .GMT file specified in GMTdatabaseFile variable exists.
+In interactive sessions run from an R console, needed ontology database download will commence of [SPECIES]_GO_AllPathways_with_GO_iea_[DATE]_symbol.gmt from the BaderLab download website online folder structure after interactive user input to select the species. The interaction is skipped if the .GMT file specified in GMTdatabaseFile variable exists.  Note that repetitive bulk downloads of large files during working hours can trigger a ban of the downloader's IP.
   
 
 If GO redundant term removal is enabled, ontologyIndex package will be loaded and the full go.obo file downloaded if not already present as specified in GO.OBOfile
