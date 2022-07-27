@@ -18,9 +18,6 @@ Note the current analysis output samples in the above linked .zip use June 2022 
     available from the Bader Lab website.
 
 ## INSTRUCTIONS
-  - Download "[SPECIES]_GO_AllPathways_with_GO_iea_[DATE]_symbol.gmt" from http://download.baderlab.org/EM_Genesets/current_release/
-  - (optional) Download go.obo from http://current.geneontology.org/ontology/go.obo
-    (Enables removal of redundant terms with option removeRedundantGOterms=TRUE)
   - Change parameters between the lines below, and execute GOparallel("") from function in source file GOparallel-FET.R.
 
   - Input can be:
@@ -140,5 +137,8 @@ The function for fisher exact test calculation used within GOparallel is derived
 .GMT standard tab-separated format databases are downloaded after scraping available file links from http://download.baderlab.org/EM_Genesets/current_release/
 for any of the available species there. According to the site's documentation, the 3 core GO ontology types are updated monthly, and additional curated pathways are collected from various sources, e.g. the Molecular Signatures (MSig) C2 database, Reactome, wikipathways, etc., which are updated less regularly.
 
-If GO redundant term removal is enabled, ontologyIndex package and the full go.obo will be loaded and downloaded if not already downloaded
-from <a href="http://current.geneontology.org/ontology/go.obo">http://current.geneontology.org/ontology/go.obo</a> and specified as GO.OBOfile
+In interactive sessions run from an R console, needed ontology database download will commence of "[SPECIES]_GO_AllPathways_with_GO_iea_[DATE]_symbol.gmt" from http://download.baderlab.org/EM_Genesets/current_release/ online folder structure.
+  
+
+If GO redundant term removal is enabled, ontologyIndex package will be loaded and the full go.obo file downloaded if not already present as specified in GO.OBOfile
+from <a href="http://current.geneontology.org/ontology/go.obo">http://current.geneontology.org/ontology/go.obo</a>
