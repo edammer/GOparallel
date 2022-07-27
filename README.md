@@ -5,84 +5,66 @@ WGCNA modules can be co-clustered for relatedness of modules by GO-cellular comp
 
 Compatible with the Seyfried systems biology pipeline.
 
-See Instructions in the R function wrapper code to set all needed variables in the global environment before the function call.
+See Instructions below and use R wrapper code to set all needed variables in the global environment before the function call. For 2 input options, Seyfried analysis pipeline should already have been run, or outputs loaded into memory.
 
 Sample input for <a href="https://github.com/edammer/GOparallel/raw/main/PipelineSample-MEGATMT-WGCNA-NatNeurosci2022.RData">WGCNA modules</a>, or <a href="https://github.com/edammer/GOparallel/raw/main/PipelineSample-MEGATMT-ANOVA%2BVolcano-NatNeurosci2022.RData">ANOVA-Tukey table + volcano settings</a> from pipeline outputs can be downloaded and loaded from .RData files prior to using this wrapper. Outputs will reproduce what is contained in <a href="https://github.com/edammer/GOparallel/blob/main/GOparallel-SampleOutput.zip">this .zip</a>. These sample analysis inputs use the 8619 fully corrected, age, sex, and PMI-regressed protein abundance data from <a href="https://www.nature.com/articles/s41593-021-00999-y">Johnson ECB, et al, Nat Neurosci., 2022</a>, processed through the Seyfried Lab systems biology pipeline, of which GOparallel is a late step.
 
-Note the current analysis output samples are using June 2022 ontologies, much newer compared to those in the publication, which was based on the GO-Elite Ensembl v62+ database.
+Note the current analysis output samples in the above linked .zip use June 2022 ontologies, much newer compared to those in the publication, which was based on the GO-Elite Ensembl v62+ database.
+## **Functional Description**
+  - performs hypergeometric overlap with Fisher Exact Test for enrichment p<0.05
+    and 5 minimum genes per ontology
+  - currently outputs files that can be used as GO-Elite input, not read by this script...
+  - outputs Z score barplots for each input list (module, or DiffEx Protein list) across 6 ontology types in the larger GMT files
+    available from the Bader Lab website.
 
-Requires R packages: piano, WGCNA, curl, doParallel, rvest, ontologyIndex, NMF.
+## INSTRUCTIONS
+  - Download "[SPECIES]_GO_AllPathways_with_GO_iea_[DATE]_symbol.gmt" from http://download.baderlab.org/EM_Genesets/current_release/
+  - (optional) Download go.obo from http://current.geneontology.org/ontology/go.obo
+    (Enables removal of redundant terms with option removeRedundantGOterms=TRUE)
+  - Change parameters between the lines below, and execute GOparallel("") from function in source file GOparallel-FET.R.
+
+  - Input can be:
+    1) a .csv file with uniqueIDs (Symbol|otherID(s)...) or species-appropriate gene symbols in columns.
+       (Each will be considered as a list of DEPs or module members); specify fileName and have below two flags =FALSE.
+       alternately, the input can be a WGCNA kME table output from the Seyfried systems pipeline saved as .csv.
+    2) cleanDat, net$colors, and kMEdat from Seyfried systems biology pipeline loaded in memory              (modulesInMemory=TRUE)
+    3) ANOVA/T-Test statistics table with <a href="https://github.com/edammer/parANOVA">Seyfried volcano code block (plotVolc function)</a> data structures loaded in memory       (ANOVAgroups=TRUE)
+
+  - Outputs are:
+    1) Z score barplots with min z ~1.96 (p<0.05) calculated from Fisher Exact Test ORA (one-tailed) p values. One barplot is
+       created for each input list (module, or up DEGs, or down DEGs for each ANOVA/T-test comparison in ANOVAout).
+    2) Tab-separated .txt table of all lists' signed Zscores (each list is a column) for all ~13000 ontologies.
+       Z scores are converted from p values as two-tailed p values, since each enrichment and depletion p value is calculated
+       to get signed Z scores (less than zero if depleted more than by chance).  I.e. the conversion to Z uses p/2.
+    3) Tab-separated .txt table of all lists' Enrichment p values
+    4) Tab-separated .txt table of all lists' Enrichment Benjamini-Hochberg corrected FDR values.
+    5) (optional) GO:Cellular Component ontologies with at least one highly significant list enrichment are coclustered
+       in a heatmap of signed Zscores across all lists. Works well with WGCNA module input.                   (cocluster=TRUE)
+##
 
 
 Wrapper code for function GOparallel():
 ```
+###################################################################################################################################
+## One-Step GSA FET (R piano implementation) WITH USER PARAMETERS
+##  - by Eric Dammer, Divya Nandakumar
+## Nicholas Seyfried Lab Bioinformatics - for the lab - 07/27/2022 version 1.01
+###################################################################################################################################
 ## Preload WGCNA standard pipeline R ression's data to memory, if desired (example minimal RData given here)
 ## otherwise below code runs as a step late in the Seyfried systems biology pipeline,
 ## or following the pipeline's volcano code block, or with .csv input formatted as simple lists
 ## in columns, or the .csv may be kME table output from the global network plots pipeline.
 ###############################################################################################
 
-setwd("c:/BaderLabGO/")
-
-## Sample pipeline outputs required to run as inputs for input scenario #2 below  -- contains empty cleanDat (only ordered rownames matching net$colors are needed here)
-load("./PipelineSample-MEGATMT-WGCNA-NatNeurosci2022.RData")
-
-## Sample pipeline outputs required to run as inputs for input scenario #3 below
-load("./PipelineSample-MEGATMT-ANOVA+Volcano-NatNeurosci2022.RData")
-
-
-###################################################################################################################################
-## One-Step GSA FET (R piano implementation) WITH USER PARAMETERS
-##  - by Eric Dammer, Divya Nandakumar
-## Nicholas Seyfried Lab Bioinformatics - for the lab - 06/10/2022 version 1.0
-####################################################################################################################################
-### The piano package can be installed from bioconductor, enabling ontology enrichment analysis on gene sets. 
-### Documentation for this package is found https://rdrr.io/bioc/piano/ before installation.
-### Other dependencies for code below include doParallel and stringr packages.
-###
-### .GMT standard tab-separated format databases can be downloaded from http://download.baderlab.org/EM_Genesets/current_release/
-### where the 3 core GO ontology types are updated monthly, and additional curated pathways are collected from various sources,
-### e.g. the Molecular Signatures (MSig) C2 database, Reactome, wikipathways, etc., which are updated less regularly.
-###
-### If GO redundant term removal enabled, ontologyIndex package and the full go.obo will be specified, should have been downloaded
-### from http://current.geneontology.org/ontology/go.obo
-###
-####################################################################################################################################
-##  *Functional Description*
-##  - performs hypergeometric overlap with Fisher Exact Test for enrichment p<0.05
-##    and 5 minimum genes per ontology
-##  - currently outputs files that can be used as GO-Elite input, not read by this script...
-##  - outputs Z score barplots for each input list (module, or DiffEx Protein list) across 6 ontology types in the larger GMT files
-##    available from the Bader Lab website.
-##
-##  *INSTRUCTIONS*
-##  - Download "[SPECIES]_GO_AllPathways_with_GO_iea_[DATE]_symbol.gmt" from http://download.baderlab.org/EM_Genesets/current_release/
-##  - (optional) Download go.obo from http://current.geneontology.org/ontology/go.obo
-##    (Enables removal of redundant terms with option removeRedundantGOterms=TRUE)
-##  - Change parameters between the lines below, and execute GOparallel("") from function in source file GOparallel-FET.R.
-##
-##  - Input can be:
-##    1) a .csv file with uniqueIDs (Symbol|otherID(s)...) or species-appropriate gene symbols in columns.
-##       (Each will be considered as a list of DEPs or module members); specify fileName and have below two flags =FALSE.
-##       alternately, the input can be a WGCNA kME table output from the Seyfried systems pipeline saved as .csv.
-##    2) cleanDat, net$colors, and kMEdat from Seyfried systems biology pipeline loaded in memory              (modulesInMemory=TRUE)
-##    3) ANOVA/T-Test statistics table with Seyfried volcano code block data structures loaded in memory       (ANOVAgroups=TRUE)
-##
-##  - Outputs are:
-##    1) Z score barplots with min z ~1.96 (p<0.05) calculated from Fisher Exact Test ORA (one-tailed) p values. One barplot is
-##       created for each input list (module, or up DEGs, or down DEGs for each ANOVA/T-test comparison in ANOVAout).
-##    2) Tab-separated .txt table of all lists' signed Zscores (each list is a column) for all ~13000 ontologies.
-##       Z scores are converted from p values as two-tailed p values, since each enrichment and depletion p value is calculated
-##       to get signed Z scores (less than zero if depleted more than by chance).  I.e. the conversion to Z uses p/2.
-##    3) Tab-separated .txt table of all lists' Enrichment p values
-##    4) Tab-separated .txt table of all lists' Enrichment Benjamini-Hochberg corrected FDR values.
-##    5) (optional) GO:Cellular Component ontologies with at least one highly significant list enrichment are coclustered
-##       in a heatmap of signed Zscores across all lists. Works well with WGCNA module input.                   (cocluster=TRUE)
-##
-#####################################################################################################################################
-
 dev.off()
 options(stringsAsFactors=FALSE)
+
+## Sample pipeline outputs required to run as inputs for input scenario #2 below  -- contains empty cleanDat (only ordered rownames matching net$colors are needed here)
+load("c:/BaderLabGO/PipelineSample-MEGATMT-WGCNA-NatNeurosci2022.RData")
+
+## Sample pipeline outputs required to run as inputs for input scenario #3 below
+load("c:/BaderLabGO/PipelineSample-MEGATMT-ANOVA+Volcano-NatNeurosci2022.RData")
+
 
 ######################## EDIT THESE VARIABLES (USER PARAMETERS SET IN GLOBAL ENVIRONMENT) ############################################
 #fileName <- "ENDO_MG_TWO_WAY_LIST_NTS_v02b_forGOelite.csv"                                            #Sample File 1 - has full human background
@@ -107,7 +89,8 @@ maxBarsPerOntology=5
 
 GMTdatabaseFile="c:/BaderLabGO/current.gmt"   # e.g. "Human_GO_AllPathways_with_GO_iea_June_01_2022_symbol.gmt"
                                               # Current month release will be downloaded if file does not exist.
-					      # Specify a nonexistent file to always download the current database.
+					      # **Specify a nonexistent file to always download the current database to this folder.**
+					      # Database .GMT file will be saved to the specified folder with its original date-specific name.
             #path/to/filename of ontology database for the appropriate species (no conversion is performed)
             #BaderLab website links to their current monthly update of ontologies for Human, Mouse, and Rat, minimally
             #http://download.baderlab.org/EM_Genesets/current_release/
@@ -136,7 +119,7 @@ removeRedundantGOterms=TRUE
             #if true, the 3 GO ontology types are collapased into a minimal set of less redundant terms using the below OBO file
 GO.OBOfile<-"C:/BaderLabGO/go.obo"
             #only used and needed if above flag to remove redundant GO terms is TRUE.
-	    #Download from http://current.geneontology.org/ontology/go.obo will commence if needed.
+	    #Download from http://current.geneontology.org/ontology/go.obo will commence into the specified folder if the specified filename does not exist.
             #Does not appear to be species specific, stores all GO term relations and is periodically updated.
 
 cocluster=TRUE
@@ -147,5 +130,15 @@ cocluster=TRUE
 source("GOparallel-FET.R")
 GOparallel("")  # parameters must be set in global environment as above; no defaults are specified for the function or passed to it.
 
+```
+## Other Notes
+Requires R packages: piano, WGCNA, curl, doParallel, rvest, ontologyIndex, NMF, stringr.
+The piano package (documentation <a href="https://rdrr.io/bioc/piano/">here</a>) can be installed from bioconductor, enabling ontology enrichment analysis on gene sets.
 
-#save.image(paste0("saved.image.GSA.GO.FET-",outFilename,"-completed.Rdata"))
+The function for fisher exact test calculation used within GOparallel is derived from a similar function in the piano package, with its dependencies, but further calculates the p values of both enrichment and depletion so that we have signed Zscores available.
+##
+.GMT standard tab-separated format databases are downloaded after scraping available file links from http://download.baderlab.org/EM_Genesets/current_release/
+for any of the available species there. According to the site's documentation, the 3 core GO ontology types are updated monthly, and additional curated pathways are collected from various sources, e.g. the Molecular Signatures (MSig) C2 database, Reactome, wikipathways, etc., which are updated less regularly.
+
+If GO redundant term removal is enabled, ontologyIndex package and the full go.obo will be loaded and downloaded if not already downloaded
+from <a href="http://current.geneontology.org/ontology/go.obo">http://current.geneontology.org/ontology/go.obo</a> and specified as GO.OBOfile
