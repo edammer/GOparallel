@@ -135,7 +135,7 @@ removeRedundantGOterms=TRUE
             #if true, the 3 GO ontology types are collapased into a minimal set of less redundant terms using the below OBO file
 GO.OBOfile<-"C:/BaderLabGO/go.obo"
             #only used and needed if above flag to remove redundant GO terms is TRUE.
-	    #Download from from http://current.geneontology.org/ontology/go.obo will commence if needed.
+	    #Download from http://current.geneontology.org/ontology/go.obo will commence if needed.
             #Does not appear to be species specific, stores all GO term relations and is periodically updated.
 
 cocluster=TRUE
