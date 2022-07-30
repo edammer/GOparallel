@@ -5,10 +5,15 @@
 ###################################################################################################################################
 
 GOparallel <- function(dummyVar="",env=.GlobalEnv) {
+	if(!exists("filePath")) { cat(paste0("- filePath not set. Using current working directory: ",getwd(),"\n")); filePath=getwd(); }
 	## Clean out spaces and escaped backslashes from folder paths (folder names with spaces should not be used on non-windows systems with this script)
 	#filePath=paste0(paste( sapply(do.call(c,strsplit(filePath,"[/\\]")),function(x) { if (grepl(" ",x)) { gsub(x,paste0(substr(gsub(" ","",x),1,6),"~1"),x) } else { x } } ),collapse="/"),"/")
 	filePath=paste0(paste( sapply(do.call(c,strsplit(filePath,"[/\\]")),function(x) { if (grepl(" ",x)) { gsub(" ","\ ",x) } else { x } } ),collapse="/"),"/")
+	if(!dir.exists(filePath)) { cat(paste0("- filePath set to ",filePath," ...this path was not found. Using current working directory: ",getwd(),"\n")); filePath=getwd(); }
+	
+	if(!exists("GMTdatabaseFile")) { cat(paste0("- GMTdatabaseFile variable not specified. Current BaderLab .GMT database file will be downloaded to ",filePath,"\n")); GMTdatabaseFile=paste0(filePath,"nonexistent.file"); }
 	GMTdatabaseFile=paste0(paste( sapply(do.call(c,strsplit(GMTdatabaseFile,"[/\\]")),function(x) { if (grepl(" ",x)) { gsub(" ","\ ",x) } else { x } } ),collapse="/"),"")
+	if(!exists("GO.OBOfile")) { cat(paste0("- go.obo file not specified; if needed, current working directory will be checked and if not present, will be downloaded...\n")); GO.OBOfile=paste0(getwd(),"/go.obo"); }
 	GO.OBOfile=paste0(paste( sapply(do.call(c,strsplit(GO.OBOfile,"[/\\]")),function(x) { if (grepl(" ",x)) { gsub(" ","\ ",x) } else { x } } ),collapse="/"),"")
 	
 	#pythonPath=paste0(paste( sapply(do.call(c,strsplit(pythonPath,"[/\\]")),function(x) { if (grepl(" ",x)) { gsub(x,paste0(substr(gsub(" ","",x),1,6),"~1"),x) } else { x } } ),collapse="/"),"/")
@@ -33,17 +38,19 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	## Preparing files for GO-Elite ##
 	## Takes in the module assignment file as input with 1st column having gene names, 2nd column having color assignments followed by kME values
 	
-	
-	dir.create(file.path(filePath, outFilename))
+
+	if (!exists("filePath")) { cat(paste0(" - filePath variable not specified. Input/Output will take place in the current working directory: ",getwd(),"/ ...\n")); filePath==paste0(getwd(),"/"); }
+	if (!exists("outFilename")) { cat(paste0("- outFilename variable not specified. Output files will be saved to: ",getwd(),"/GOparallel/ ...\n")); outFilename="GOparallel"; }
+	if (!dir.exists(file.path(filePath, outFilename))) dir.create(file.path(filePath, outFilename))
 	
 	if(!file.exists(GMTdatabaseFile)) {
 		if (interactive()) {
-			require(rvest,quietly=TRUE)
+			suppressPackageStartupMessages(require(rvest,quietly=TRUE))
 			species.links <- html_attr(html_nodes(read_html("http://download.baderlab.org/EM_Genesets/current_release/"), xpath="//a"), "href")
 			species.links <- species.links[grepl("^[A-z].*\\/$",species.links)]
-			cat("GMT File not found: ", GMTdatabaseFile,"\n\n")
+			cat("- GMT File not found: ", GMTdatabaseFile,"\n\n")
 			print(data.frame(Species=species.links))
-			input.idx <- readline(paste0("Choose one of the above species from http://download.baderlab.org/EM_Genesets/current_release/ [1-",length(species.links),"]: "))
+			input.idx <- readline(paste0("[INTERACTIVE]\nChoose one of the above species from http://download.baderlab.org/EM_Genesets/current_release/ [1-",length(species.links),"]: "))
 			input.idx <- as.integer(input.idx)
 		
 			find.symbol.in.links <- html_attr(html_nodes(read_html(paste0("http://download.baderlab.org/EM_Genesets/current_release/",species.links[input.idx])), xpath="//a"), "href")
@@ -51,13 +58,13 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 			gmt.links <- html_attr(html_nodes(read_html(paste0("http://download.baderlab.org/EM_Genesets/current_release/",species.links[as.integer(input.idx)],find.symbol.in.links)), xpath="//a"), "href")
 			full.dl.file=gmt.links[grepl("*\\_GO\\_AllPathways\\_with\\_GO\\_iea\\_.*\\.[Gg][Mm][Tt]",gmt.links)]
 		
-			GMTtargetPath=gsub("(.*\\/).*$","\\1",GMTdatabaseFile)
+			GMTtargetPath=gsub("\\/\\/","/", gsub("(.*\\/).*$","\\1",GMTdatabaseFile) )
 			gmt.url<-paste0("http://download.baderlab.org/EM_Genesets/current_release/",species.links[input.idx],find.symbol.in.links,full.dl.file)
 			cat("Found full current GMT file:  ",gmt.url,"\n")
 			cat("Download this file to folder:  ",GMTtargetPath,"\n")
 			input.dlYN <- readline("[Y/n]?")
 			if(input.dlYN == "Y" | input.dlYN == "y" | input.dlYN == "") {
-				require(curl,quietly=TRUE)
+				suppressPackageStartupMessages(require(curl,quietly=TRUE))
 				if (!dir.exists(GMTtargetPath)) dir.create(GMTtargetPath)
 				curr.dir<-getwd()
 				setwd(GMTtargetPath)
@@ -69,15 +76,16 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 			}
 		} else { stop(paste0("This is not an interactive session and required GMT file not found.\n",GMTdatabaseFile," must be downloaded interactively or prior to running this function.")) }
 	}
-	
+
+	if(!exists("removeRedundantGOterms")) { cat("- removeRedundantGOterms not specified TRUE/FALSE. Removing them as the default, using go.obo and ontologyIndex package.\n"); removeRedundantGOterms=TRUE; }
 	if(removeRedundantGOterms) {
 		if (!file.exists(GO.OBOfile)) {
-			require(curl,quietly=TRUE)
+			suppressPackageStartupMessages(require(curl,quietly=TRUE))
 			OBOtargetPath=gsub("(.*\\/).*$","\\1",GO.OBOfile)
 			if (!dir.exists(OBOtargetPath)) dir.create(OBOtargetPath)
 			curr.dir<-getwd()
 			setwd(OBOtargetPath)
-			cat(paste0("Downloading go.obo file for main GO term redundancy cleanup...\n...to location:  ",OBOtargetPath,"go.obo\n"))
+			cat(paste0("- Downloading go.obo file for main GO term redundancy cleanup...\n...to location:  ",OBOtargetPath,"go.obo\n"))
 			curl_download(url="http://current.geneontology.org/ontology/go.obo", destfile="go.obo", quiet = TRUE, mode = "w")
 			setwd(curr.dir)
 			cat("GO.OBOfile set to downloaded file: ", paste0(OBOtargetPath,"go.obo"),"\n")
@@ -85,19 +93,133 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 		}
 	}
 	
+	## Check what type of input the user wants. modulesInMemory/ANOVAgroups/
+	if (!exists("ANOVAgroups") & !exists("modulesInMemory")) {
+	  if(!exists("fileName")) {
+	    cat("- No input specified as modulesInMemory=TRUE, ANOVAgroups=TRUE, and no fileName variable for input either.\n  Trying modulesInMemory=TRUE ...\n")
+	    modulesInMemory=TRUE
+	    ANOVAgroups=FALSE
+	  } else {
+	    if(!file.exists(file.path(filePath,fileName))) stop(paste0("\nfileName input specified but not found where expected, in: ",paste0(filePath,fileName),"\nDid you mean to set ANOVAgroups or modulesInMemory=TRUE?\n\n"))
+	    ANOVAgroups=FALSE
+	    modulesInMemory=FALSE
+	  }
+	} else {
+	  if(exists("ANOVAgroups")) {
+	    if(is.logical(ANOVAgroups)) {
+	      if(ANOVAgroups) {
+	        if(exists("ANOVAout")) { cat("- Found ANOVAgroups=TRUE. Proceeding to process ANOVAout table from memory, using any selections and thresholds set during volcano plotting...\n"); modulesInMemory=FALSE; } else { if (!length(dummyVar)==1) { cat("- ANOVAout not in memory, trying to use input provided to this function.\n"); ANOVAout=as.data.frame(dummyVar); } else { stop("Variable ANOVAout not found or no input was provided.\nPlease run parANOVA.dex() function first, and save output to ANOVAout variable or pass its output to this function.\n\n") } }
+	      } else {
+	        if(exists("modulesInMemory")) if(is.logical("modulesInMemory")) if(!modulesInMemory) {  # both flags are FALSE
+	          if(!exists("fileName")) { stop("modulesInMemory=FALSE, ANOVAgroups=FALSE, and no fileName variable for input either.\nOne of these must be used.\n") }
+	        } else {
+	          cat("- modulesInMemory=TRUE. We will use network module colors vector and symbols found in rownames of cleanDat table for gene lists to check for ontology enrichment.\n")
+	        }
+	      }
+	    } else {  #ANOVAgroups not logical TRUE/FALSE
+	      if(exists("modulesInMemory")) if(is.logical("modulesInMemory")) if(!modulesInMemory) {  # modulesInMemory is FALSE
+	        if(!exists("fileName")) { cat("- modulesInMemory=FALSE, ANOVAgroups not TRUE/FALSE, and no fileName variable for input either.\nOne of these must be used.  Trying ANOVAgroups=TRUE ...\n"); ANOVAgroups=TRUE; 
+	                                 if(exists("ANOVAout")) { cat("- Found ANOVAout. Proceeding to process ANOVAout table from memory, using any selections and thresholds set during volcano plotting...\n") } else { stop("\nANOVAout table not found in memory.\n\n") }
+	        } else {  # fileName variable set. Does the file exist?
+	          if(file.exists(file.path(filePath,fileName))) { cat("- found fileName as set for input: ",paste0(filePath,fileName),"\n"); ANOVAgroups=FALSE; } else { stop("\nfileName as specified not found: ",paste0(filePath,fileName),"\n\n"); }
+	        }
+	      } else {  # modulesInMemory is TRUE
+	        cat("- modulesInMemory=TRUE. We will use network module colors vector and symbols found in rownames of cleanDat table for gene lists to check for ontology enrichment.\n")
+	        ANOVAgroups=FALSE
+	      }
+	    }
+	  } else { # ANOVAgroups does not exist, but modulesInMemory exists. Is it TRUE?
+	    if(exists("modulesInMemory")) {
+	      if(is.logical(modulesInMemory)) {
+	        if(modulesInMemory) {
+	          cat("- modulesInMemory=TRUE.\n  We will use network module colors vector and symbols found in rownames of cleanDat table for gene lists to check for ontology enrichment.\n  Note rownames of cleanDat table must contain gene symbol, and NETcolors or net$colors vector of module color assignments must be available.\n")
+	        } else {
+	          if(!exists("fileName")) { cat("- modulesInMemory=FALSE, ANOVAgroups not TRUE/FALSE, and no fileName variable for input either.\nOne of these must be used.  Trying ANOVAgroups=TRUE ...\n"); ANOVAgroups=TRUE; 
+	                                   if(exists("ANOVAout")) { cat("- Found ANOVAout. Proceeding to process ANOVAout table from memory, using any selections and thresholds set during volcano plotting...\n") } else { stop("\nANOVAout table not found in memory.\n\n") }
+	          } else {  # fileName variable set. Does the file exist?
+	            if(file.exists(file.path(filePath,fileName))) { cat("- found fileName as set for input: ",paste0(filePath,fileName),"\n"); ANOVAgroups=FALSE; } else { stop("\nfileName as specified not found: ",paste0(filePath,fileName),"\n\n"); }
+	          }
+	        }
+	      } else {  #modulesInMemory not logical TRUE/FALSE
+	        if(!exists("fileName")) {
+	          cat("- ANOVAgroups not set, modulesInMemory not TRUE/FALSE, and no fileName variable for input either.\nOne of these must be used.  Trying modulesInMemory=TRUE ...\n")
+	          modulesInMemory=TRUE;
+	          ANOVAgroups=FALSE;
+	        } else {  # fileName variable set. Does the file exist?
+	          if(file.exists(file.path(filePath,fileName))) { cat("- found fileName as set for input: ",paste0(filePath,fileName),"\n"); ANOVAgroups=FALSE; modulesInMemory=FALSE; } else { stop("\nfileName as specified not found: ",paste0(filePath,fileName),"\n\n"); }
+	        }
+	      }
+	    } #else { #both ANOVAgroups and modulesInMemory do not exist; handled first above.
+	  }
+	}
+	          
+	## Further checks if modulesInMemory=TRUE for nrow(cleanDat)==NETcolors; and choice of vector for NETcolors
+	if(modulesInMemory) {
+	  if (!exists("cleanDat")) stop("cleanDat variable must exist, rownames expected to hold gene symbols in the form of 'Symbol' or 'Symbol|...'.\n\n")
+	  if (!exists("NETcolors")) {
+	    if(exists("net")) if ("colors" %in% names(net)) {
+	      NETcolors=net$colors
+	    } else {
+	      if ("NETcolors" %in% colnames(ANOVAout)) {
+	        NETcolors=ANOVAout$NETcolors
+	      } else {
+	        NETcolors=c()
+	      }
+	    }
+	  }
+	  if (!length(NETcolors)==nrow(cleanDat)) { stop("\n\nNetwork color assignment vector not supplied or not of length in rows of cleanDat.\nEvery gene product needs a module (color) assignment when modulesInMemory=TRUE.\n\n") }
+	}
+
+	if (!exists("parallelThreads")) { cat("- parallelThreads variable not set. Attempting to run with 8 threads.\n"); parallelThreads=8; }
+	if (!exists("outputGOeliteInputs")) outputGOeliteInputs=FALSE
+
 	##1a. Organize input gene lists, of the significant up and down (p<0.05) proteins in the current cleanDat
 	### List building from ANOVA-defined categories ###
 	if (ANOVAgroups) {
+
+	  if (!exists("ANOVAout")) if (!length(dummyVar)==1) { cat("- ANOVAout not in memory, trying to use input provided to this function.\n"); ANOVAout=as.data.frame(dummyVar); } else { stop("Variable ANOVAout not found or no input was provided.\nPlease run parANOVA.dex() function first, and save output to ANOVAout variable or pass its output to this function.\n\n") }
+	  if (!ncol(ANOVAout)>3) stop("\n\nInput or ANOVAout variable contents are not a data (frame) with at least 4 columns. It is not valid output from the parANOVA.dex() function.\n  Please run parANOVA.dex() first.\n\n")
+	  
+	  numberOfNonComparisonColumns=length(colnames(ANOVAout)) - length(which(grepl("diff ",colnames(ANOVAout))))*2
+	  numComp <- (length(colnames(ANOVAout)) - numberOfNonComparisonColumns) / 2 # of columns separating comparisons from matched column of log2(diffs), i.e. # of comparisons
+
+	  if (!exists("testIndexMasterList")) {
+	    if(exists("selectComps")) { cat("- Volcano (plotVolc) selection of pairwise comparisons in ANOVAout taken from variable selectComps.\n"); testIndexMasterList=selectComps; } else { cat("- No comparison p value columns previously selected by running plotVolc(). Using ALL comparisons.\n"); testIndexMasterList="ALL"; }
+	  }
+	  if (testIndexMasterList[1]=="ALL" | testIndexMasterList[1]=="all" | testIndexMasterList[1]=="All") testIndexMasterList=c(3:(numComp+2))
+	  testIndexMasterList=as.integer(testIndexMasterList)
+	  if (max(testIndexMasterList)>numComp+2 | min(testIndexMasterList)<3) stop("testIndexMasterList specifies column numbers of ANOVAout that do not hold p values.\n\n")
+	  if(!exists("flip")) { cat("- No comparisons selected for flipping numerator and denominator. Variable flip=c().\n"); flip=c(); }
+
+	  if(!exists("dexComps") | !exists("comparisonIDs")) {
+	    cat("- Extracting names of groups being compared in ANOVAout table from p value column headers...\n")
+	    dexComps <- list()
+	    iter <- length(testIndexMasterList) + 1
+	    comparisonIDs <- data.frame(dfVariable = rep(NA, length(testIndexMasterList)), Comparison = rep(NA, length(testIndexMasterList)))
+	    for (i in testIndexMasterList) {
+	      iter <- iter - 1
+	      comparisonIDs[iter, ] <- as.vector(c(paste0("dexTargets.", gsub("-", ".", colnames(ANOVAout)[i])), paste0(as.character(gsub("-", " vs ", colnames(ANOVAout)[i])))))
+	      dexComps[[comparisonIDs[iter, 1]]] <- ANOVAout
+	      if (!is.na(match(i, flip))) {
+	        dexComps[[comparisonIDs[iter, 1]]][, i + numComp] <- -1 * as.numeric(dexComps[[comparisonIDs[iter, 1]]][, i + numComp])
+	        comparisonIDs[iter, 2] <- gsub("(*.*) vs (*.*)", "\\2 vs \\1", comparisonIDs[iter, 2]) # flip label "vs" in comParisonIDs$Comparison[iter]
+	      }
+	    }
+	  }
+	  # comparisonIDs  # list element names and Logical comparisons for those retrievable Dex measurements in the list elements
+	  # ls(dexComps)   # list elements are dataframes with the DEX entries for that comparison
+
+
+	  ANOVAout$Symbol <- do.call("rbind", strsplit(as.character(rownames(ANOVAout)), "[|]"))[, 1]
+	  if(length(which(grepl(";",ANOVAout$Symbol)))>0) {
+	    cat("- *Found some gene symbols have semicolons! Splitting these and keeping only symbol *before* semicolon.\n")
+	    ANOVAout$Symbol<-do.call("rbind",strsplit(as.character(ANOVAout$Symbol), "[;]"))[,1]
+	  }
+
+	  cat("\n")
+
 	  if (!exists("sigThresh")) if(exists("sigVolcCutoff")) { sigThresh=sigVolcCutoff } else { sigThresh=0.05 }
 	  print(paste0("...Applying a minimum p value cutoff of ",sigThresh," for ANOVA lists..."))
-
-	  #colnames(ANOVAout)
-	  #********************
-	  ##This code relies on a pre-existing data frame ANOVAout already in the environment, processed through volcano output for selected pairwise comparisons of interest.
-	  #numComp=6 #number of pairwise comparisons for ANOVA+Tukey p value columns, which are followed by the same-order log2(mean difference) columns
-	  #********************
-	
-	  ANOVAout$Symbol <- do.call("rbind", strsplit(as.character(rownames(ANOVAout)), "[|]"))[, 1]
 
 	  if (!exists("FCmin")) FCmin=0
 	  cutoff=log2(1+FCmin)
@@ -142,90 +264,108 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	##1b. Organize input gene lists from the WGCNA modules, either from specified input file or in the current cleanDat, net, and kME table
 	### List-building from WGCNA-defined modules ###
 	
-	##use data structures in memory if modulesInMemory=TRUE; otherwise read csv following the template which is written in an earlier R session and edited in excel to produce module membership table saved as .csv:
-	if (modulesInMemory) {
-	  modulesData <- cbind(rownames(cleanDat),net$colors,kMEdat)
-	  WGCNAinput=TRUE
-	} else {
-	  modulesData <- read.csv(paste(filePath,fileName,sep=""),header=TRUE, sep=",");
-	  # check if this is a WGCNA modules/kME table or simple list input
-	  if(length(na.omit(match("net.colors",colnames(modulesData))))>0) {
+	  ##use data structures in memory if modulesInMemory=TRUE; otherwise read csv following the template which is written in an earlier R session and edited in excel to produce module membership table saved as .csv:
+	  if (modulesInMemory) {
+	    modulesData <- as.data.frame(cbind(rownames(cleanDat),NETcolors))
 	    WGCNAinput=TRUE
-	    # Remove first and last column if it contains sort information ("Original Order" and "color|kMEin")
-	    modulesData <- modulesData[,-c(1,ncol(modulesData))];
 	  } else {
-	    WGCNAinput=FALSE
-	  }
-	}
-	
-	if (WGCNAinput) {
-	  require(WGCNA,quietly=TRUE) #for labels2colors
-	
-	  # Include column with Symbol (if it is gene symbol, if not use appropriate code as given in GO-Elite manual)
-	  modulesData$SystemCode <- rep("Sy",nrow(modulesData)) 
-	
-	  # Assign Names of First columns, in case they are non standard
-	  colnames(modulesData)[1]<-"Unique.ID" #This should have Symbol|UniprotID
-	  colnames(modulesData)[2]<-"net.colors" #This should have colors
-	
-	  #Split out symbols from UniprotIDs, keep symbols in column 1
-	  rownames(modulesData)<-modulesData$Unique.ID
-	  modulesData$Unique.ID<-do.call("rbind",strsplit(as.character(modulesData$Unique.ID), "[|]"))[,1]
-	
-	  ## Creating background file for GO Elite analysis
-	  background <- unique(modulesData[,"Unique.ID"])
-	  background <- cbind(background,rep("Sy",length=length(background)))
-	  colnames(background) <- c("GeneSymbol","SystemCode")
-	  if(outputGOeliteInputs) dir.create(file.path(paste0(filePath,outFilename),"background"))
-	  if(outputGOeliteInputs) write.table(background,paste0(filePath,outFilename,"/background/background.txt"),row.names=FALSE,col.names=TRUE,quote=FALSE,sep="\t")
-	
-	  # Separate into independent module txt files for analysis by GO-Elite (CREATE INPUT FILES)
-	  greySubtractor=if(length(which(modulesData$net.colors=="grey"))>0) { 1 } else { 0 } #remove grey from count of modules
-	  nModules <- length(unique(modulesData$net.colors))-greySubtractor
-	  moduleColors <- uniquemodcolors <- labels2colors(c(1:nModules)) 
-	  for (i in 1:length(moduleColors)) {
-	    moduleName <- moduleColors[i]
-	    ind <- which(colnames(modulesData) == gsub("kMEME","kME",paste("kME",moduleName,sep="")))
-	    moduleInfo <- modulesData[modulesData$net.colors == gsub("ME","",moduleName), c(1,ncol(modulesData),ind)]
-	    colnames(moduleInfo) <- c("GeneSymbol","SystemCode","kME")
-	    if (moduleName == "blue" | moduleName == "brown" | moduleName == "green" | moduleName == "cyan") { if(outputGOeliteInputs) write.table(moduleInfo,file=paste(filePath,outFilename,"/",moduleName,"_2_Module.txt",sep=""),row.names=FALSE,col.names=TRUE,sep="\t", quote=FALSE)
+	    modulesData <- read.csv(paste(filePath,fileName,sep=""),header=TRUE, sep=",");
+	    # check if this is a WGCNA modules/kME table containing net.colors, or NETcolors column; (otherwise it is assumed to be simple list input)
+	    if("net.colors" %in% colnames(modulesData)) {
+	      WGCNAinput=TRUE
+	      # .csv column before colors is assumed to contain Unique IDs (Symbol|...) unless colors are in first column; then it's assumed to be in column following colors
+	      NETcolors.idx=which("net.colors" %in% colnames(modulesData))[1]
+	      if(NETcolors.idx==1) { modulesData <- as.data.frame(modulesData[,c(NETcolors.idx+1,NETcolors.idx)]); } else { modulesData <- as.data.frame(modulesData[,c(NETcolors.idx-1,NETcolors.idx)]); }
 	    } else {
-	      if(outputGOeliteInputs) write.table(unique(moduleInfo),file=paste(filePath,outFilename,"/",moduleName,"_Module.txt",sep=""),row.names=FALSE,col.names=TRUE,sep="\t", quote=FALSE)
+	      if("NETcolors" %in% colnames(modulesData)) {
+	        WGCNAinput=TRUE
+	        # .csv column before colors is assumed to contain Unique IDs (Symbol|...) unless colors are in first column; then it's assumed to be in column following colors
+	        NETcolors.idx=which("NETcolors" %in% colnames(modulesData))[1]
+	        if(NETcolors.idx==1) { modulesData <- as.data.frame(modulesData[,c(NETcolors.idx+1,NETcolors.idx)]); } else { modulesData <- as.data.frame(modulesData[,c(NETcolors.idx-1,NETcolors.idx)]); }
+	      } else {
+	        WGCNAinput=FALSE
+	      }
 	    }
 	  }
-	} else { #input is not WGCNA kME table format
 	
-	##1c. List building from the WGCNA modules from specified input file, which must be in a column-wise list format, and including longest such list as background.
-	  # We process the input file as simple lists by column in the CSV (largest list used as background)
+	  if (WGCNAinput) {
+	    suppressPackageStartupMessages(require(WGCNA,quietly=TRUE)) #for labels2colors
+	  
+	    # Include column with Symbol (if it is gene symbol, if not use appropriate code as given in GO-Elite manual)
+	    modulesData$SystemCode <- rep("Sy",nrow(modulesData)) 
+	  
+	    # Assign Names of First columns, in case they are non standard
+	    colnames(modulesData)[1]<-"Unique.ID" #This should have Symbol|UniprotID
+	    colnames(modulesData)[2]<-"net.colors" #This should have colors
+	    
+	    #Split out symbols from UniprotIDs, keep symbols in column 1
+	    rownames(modulesData)<-modulesData$Unique.ID
+	    modulesData$Unique.ID<-do.call("rbind",strsplit(as.character(modulesData$Unique.ID), "[|]"))[,1]
+	    if(length(which(grepl(";",modulesData$Unique.ID)))>0) {
+	      cat("- *Found some gene symbols have semicolons! Splitting these and keeping only symbol *before* semicolon.\n")
+	      modulesData$Unique.ID<-do.call("rbind",strsplit(as.character(modulesData$Unique.ID), "[;]"))[,1]
+	    }
+	    
+	    ## Creating background file for GO Elite analysis
+	    background <- unique(modulesData[,"Unique.ID"])
+	    background <- cbind(background,rep("Sy",length=length(background)))
+	    colnames(background) <- c("GeneSymbol","SystemCode")
+	    if(outputGOeliteInputs) dir.create(file.path(paste0(filePath,outFilename),"background"))
+	    if(outputGOeliteInputs) write.table(background,paste0(filePath,outFilename,"/background/background.txt"),row.names=FALSE,col.names=TRUE,quote=FALSE,sep="\t")
+	    
+	    # Separate into independent module txt files for analysis by GO-Elite (CREATE INPUT FILES)
+	    greySubtractor=if(length(which(modulesData$net.colors=="grey"))>0) { 1 } else { 0 } #remove grey from count of modules
+	    nModules <- length(unique(modulesData$net.colors))-greySubtractor
+	    moduleColors <- uniquemodcolors <- labels2colors(c(1:nModules)) 
+	    for (i in 1:length(moduleColors)) {
+	      moduleName <- moduleColors[i]
+	      ind <- which(colnames(modulesData) == gsub("kMEME","kME",paste("kME",moduleName,sep="")))
+	      moduleInfo <- modulesData[modulesData$net.colors == gsub("ME","",moduleName), c(1,ncol(modulesData),ind)]
+	      colnames(moduleInfo) <- c("GeneSymbol","SystemCode")  #,"kME")
+	      if (moduleName == "blue" | moduleName == "brown" | moduleName == "green" | moduleName == "cyan") { if(outputGOeliteInputs) write.table(moduleInfo,file=paste(filePath,outFilename,"/",moduleName,"_2_Module.txt",sep=""),row.names=FALSE,col.names=TRUE,sep="\t", quote=FALSE)
+	      } else {
+	        if(outputGOeliteInputs) write.table(unique(moduleInfo),file=paste(filePath,outFilename,"/",moduleName,"_Module.txt",sep=""),row.names=FALSE,col.names=TRUE,sep="\t", quote=FALSE)
+	      }
+	    }
+	  } else { #input is not WGCNA kME table format 
 	
-	  #reread the file to a list of gene symbol (or UniqueID) lists
-	  modulesData <- as.list(read.csv(paste(filePath,fileName, sep=""),sep=",", stringsAsFactors=FALSE,header=T)) 
-	
-	  nModules <- length(names(modulesData))
-	  for (a in 1:nModules) {
-	    modulesData[[a]] <- unique(modulesData[[a]][modulesData[[a]] != ""])
-	    modulesData[[a]] <- modulesData[[a]][!is.na(modulesData[[a]])]
-	    modulesData[[a]] <- do.call("rbind",strsplit(as.character(modulesData[[a]]), "[|]"))[,1]
-	  }
-	  ## Creating background file for GO Elite analysis
-	  background <- modulesData[order(sapply(modulesData,length),decreasing=TRUE)][[1]]
-	  background <- unique(background)
-	  background <- cbind(background,rep("Sy",length=length(background)))
-	  colnames(background) <- c("GeneSymbol","SystemCode")
-	  if(outputGOeliteInputs) dir.create(file.path(paste0(filePath,outFilename),"background"))
-	  if(outputGOeliteInputs) write.table(background,paste0(filePath,outFilename,"/background/background.txt"),row.names=FALSE,col.names=TRUE,quote=FALSE,sep="\t")
-	
-	  # Separate Symbol Lists into independent module txt files for analysis by GO-Elite (not performed by this script)  (CREATE INPUT FILES)
-	  modulesData[[ names(modulesData[order(sapply(modulesData,length),decreasing=TRUE)])[1] ]] <- NULL
-	  nModules = nModules -1 #no background
-	  listNames <- uniquemodcolors <- names(modulesData)
-	  for (i in listNames) {
-	    listName <- i
-	    listInfo <- cbind(modulesData[[listName]],rep("Sy",length=length(modulesData[[listName]])))
-	    colnames(listInfo) <- c("GeneSymbol","SystemCode")
-	    if(outputGOeliteInputs) write.table(unique(listInfo),file=paste(filePath,outFilename,"/",listName,".txt",sep=""),row.names=FALSE,col.names=TRUE,sep="\t", quote=FALSE)
-	  }
-	} #end if (WGCNAinput)
+	##1c. List building from the columns of a user-specified .csv input file, which must be in a column-wise list format, and including longest such list as background.
+	    # We process the input file as simple lists by column in the CSV (largest list used as background)
+	    
+	    #reread the file to a list of gene symbol (or UniqueID) lists
+	    modulesData <- as.list(read.csv(paste(filePath,fileName, sep=""),sep=",", stringsAsFactors=FALSE,header=T)) 
+	    
+	    nModules <- length(names(modulesData))
+	    semicolonsFound=FALSE
+	    for (a in 1:nModules) {
+	      modulesData[[a]] <- unique(modulesData[[a]][modulesData[[a]] != ""])
+	      modulesData[[a]] <- modulesData[[a]][!is.na(modulesData[[a]])]
+	      modulesData[[a]] <- do.call("rbind",strsplit(as.character(modulesData[[a]]), "[|]"))[,1]
+	      if(length(which(grepl(";",modulesData[[a]])))>0) {
+	        modulesData[[a]]<-do.call("rbind",strsplit(as.character(modulesData[[a]]), "[;]"))[,1]
+	      }
+	    }
+	    if(semicolonsFound) cat("- *Found some gene symbols have semicolons! Splitting these and keeping only symbol *before* semicolon.\n")
+
+	    ## Creating background file for GO Elite analysis
+	    background <- modulesData[order(sapply(modulesData,length),decreasing=TRUE)][[1]]
+	    background <- unique(background)
+	    background <- cbind(background,rep("Sy",length=length(background)))
+	    colnames(background) <- c("GeneSymbol","SystemCode")
+	    if(outputGOeliteInputs) dir.create(file.path(paste0(filePath,outFilename),"background"))
+	    if(outputGOeliteInputs) write.table(background,paste0(filePath,outFilename,"/background/background.txt"),row.names=FALSE,col.names=TRUE,quote=FALSE,sep="\t")
+	    
+	    # Separate Symbol Lists into independent module txt files for analysis by GO-Elite (not performed by this script)  (CREATE INPUT FILES)
+	    modulesData[[ names(modulesData[order(sapply(modulesData,length),decreasing=TRUE)])[1] ]] <- NULL
+	    nModules = nModules -1 #no background
+	    listNames <- uniquemodcolors <- names(modulesData)
+	    for (i in listNames) {
+	      listName <- i
+	      listInfo <- cbind(modulesData[[listName]],rep("Sy",length=length(modulesData[[listName]])))
+	      colnames(listInfo) <- c("GeneSymbol","SystemCode")
+	      if(outputGOeliteInputs) write.table(unique(listInfo),file=paste(filePath,outFilename,"/",listName,".txt",sep=""),row.names=FALSE,col.names=TRUE,sep="\t", quote=FALSE)
+	    }
+	  } #end if (WGCNAinput)
 	} #end else for if (ANOVAgroups)
 	
 	
@@ -234,7 +374,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	##2. GSA FET (parallelized within R, must have parallelThreads>1 to work currently)
 	####----------------------- piano package and dependencies required ------------------------------------#####
 	
-	require(piano,quietly=TRUE)
+	suppressPackageStartupMessages(require(piano,quietly=TRUE))
 	
 	## Adapted version of piano::runGSAhyper() function with depletion p value also calculated (for signed Z score if we will use it to cocluster by module, e.g.)
 	runGSAhyper.twoSided <- function(genes, pvalues, pcutoff, universe, gsc, gsSizeLim = c(1,Inf), adjMethod = "fdr") {
@@ -370,12 +510,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	
 	
 	## Set up parallel backend.
-	require("doParallel",quietly=TRUE)
-	# stopCluster(clusterLocal)
-	# ##when running at Emory (requires RSA public key-ssh, & manual run of script to start server backend):  
-	# parallelThreads set in configuration section.
-	# #clusterLocal <- makeCluster(c(rep("haplotein.biochem.emory.edu",parallelThreads)), type = "SOCK", port=10191, user="edammer", rscript="/usr/bin/Rscript",rscript_args="OUT=/dev/null SNOWLIB=/usr/lib64/R/library",manual=FALSE)
-	# ##when running elsewhere:
+	suppressPackageStartupMessages(require("doParallel",quietly=TRUE))
 	clusterLocal <- makeCluster(c(rep("localhost",parallelThreads)),type="SOCK")
 	registerDoParallel(clusterLocal)
 	
@@ -391,7 +526,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	if (ANOVAgroups) uniquemodcolors=names(DEXlistsForGO)  #otherwise, already set above.
 	
 	# parallelized to speed up.
-	cat("\nRunning FET overlap statistics in parallel for ",length(uniquemodcolors)," symbol lists using ", parallelThreads," threads...\n\n")
+	cat("\nRunning FET overlap statistics in parallel for ",length(uniquemodcolors)," symbol lists using up to ", parallelThreads," threads...\n\n")
 
 	#for (this.geneList in uniquemodcolors) {
 	GSA.FET.outlist <- foreach(this.geneList=uniquemodcolors) %dopar% {
@@ -476,7 +611,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	}
 	
 	if (removeRedundantGOterms) {
-		require(ontologyIndex)
+		suppressPackageStartupMessages(require(ontologyIndex))
 		ontology.index<-get_OBO(file=GO.OBOfile,extract_tags="everything")
 		#below function minimal_set uses ancestors list to dereplicate; what about using synonyms list from our go.obo as ancestors?
 	}
@@ -484,6 +619,15 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	setwd(paste0(filePath,outFilename,"/"))
 	redundancyRemovalTag=if(removeRedundantGOterms) { "-redundancyRemoved" } else { "" }
 	filenameFinal=paste0(outFilename,redundancyRemovalTag)
+
+	if(!exists("pageDimensions")) pageDimensions=c(8.5,11)
+	if(!exists("panelDimensions")) panelDimensions=c(3,2)
+	if(!exists("color")) color=c("darkseagreen3","lightsteelblue1","lightpink4","goldenrod","darkorange","gold")
+            #colors respectively for ontology Types:
+            #"Biological Process","Molecular Function","Cellular Component","Reactome","WikiPathways","MSig.C2"
+	if(!length(color)==6) color=c("darkseagreen3","lightsteelblue1","lightpink4","goldenrod","darkorange","gold")
+	if(!exists("maxBarsPerOntology")) maxBarsPerOntology=5
+	
 	
 	pdf(paste0("GSA-GO-FET_",filenameFinal,".pdf"),height=pageDimensions[2],width=pageDimensions[1])
 	op <- par(mfrow=panelDimensions,oma=c(0,0,3,0))
@@ -579,7 +723,8 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	write.table(GSA.FET.collapsed.outSimple.Pvalue.Enrichment,file=paste0(filePath,outFilename,"/GSA-GO-FET_",outFilename,"-Enr.Pvalues.txt"),row.names=FALSE,col.names=TRUE,sep="\t", quote=FALSE)
 	write.table(GSA.FET.collapsed.outSimple.Enrichment.FDR.BH,file=paste0(filePath,outFilename,"/GSA-GO-FET_",outFilename,"-Enr.FDR.BH.txt"),row.names=FALSE,col.names=TRUE,sep="\t", quote=FALSE)
 	
-	
+	if(!exists("cocluster")) cocluster=TRUE
+
 	if(cocluster) {
 	## For GO:CC Z score coclustering
 	GSA.FET.GOCC.Zscore <- GSA.FET.collapsed.outSimple.Zscore[which(GSA.FET.collapsed.outSimple.Zscore$ontologyType=="GOCC"),]
@@ -602,21 +747,23 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	data[matrixdata< -4] <- -4
 	 
 	#NMF - initial approach
-	require(WGCNA,quietly=TRUE)
+	suppressPackageStartupMessages(require(WGCNA,quietly=TRUE))
 	bw<-colorRampPalette(c("#0058CC", "white"))
 	wr<-colorRampPalette(c("white", "#CC3300"))
 	colvec<-c(bw(50),wr(50))
 
+	colnames(data)<-gsub("\\%GOCC\\%"," | ",colnames(data))
+
 	if(!modulesInMemory) {
 	  uniquemodcolors=labels2colors(1:(ncol(GSA.FET.collapsed.outSimple.Zscore)-2))  #variable reused for color annotation here; meaningless for non-WGCNA lists
-	  myRowAnnotation=data.frame(Lists=names(GSA.FET.outSimple)[order(uniquemodcolors)])
-	  heatmapLegendColors<-list(Lists=sort(uniquemodcolors))
+	  myRowAnnotation=data.frame(Lists=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
+	  heatmapLegendColors<-list(Lists=factor(sort(uniquemodcolors)))
 	} else {
 	  heatmapLegendColors<-list(Modules=sort(uniquemodcolors))
 	  myRowAnnotation=data.frame(Modules=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
 	}
 
-	require(NMF,quietly=TRUE) #for aheatmap
+	suppressPackageStartupMessages(require(NMF,quietly=TRUE))  # for aheatmap
 	pdf(file=paste0("GO_cc_clustering_from_GSA_FET_Z-",filenameFinal,".pdf"),width=18.5,height=18,onefile=FALSE)
 	  aheatmap(x=data, ## Numeric Matrix
 	         main="Co-clustering with manhattan distance function, ward metric",
