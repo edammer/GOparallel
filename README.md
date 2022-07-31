@@ -24,8 +24,10 @@ Note the current analysis output samples in the above linked .zip use June 2022 
     1) a .csv file with uniqueIDs (Symbol|otherID(s)...) or species-appropriate gene symbols in columns.
        (Each will be considered as a list of DEPs or module members); specify fileName and have below two flags =FALSE.
        alternately, the input can be a WGCNA kME table output from the Seyfried systems pipeline saved as .csv.
-    2) cleanDat, net$colors, and kMEdat variables from Seyfried systems biology pipeline loaded in memory     (modulesInMemory=TRUE)
+    2) cleanDat, net$colors (or NETcolors) variables from Seyfried systems biology pipeline loaded in memory     (modulesInMemory=TRUE)
     3) ANOVA/T-Test statistics table with <a href="https://github.com/edammer/parANOVA">Seyfried volcano code block (plotVolc function)</a> data structures loaded in memory       (ANOVAgroups=TRUE)
+
+    #3 Uses ANOVAout data in memory or passed to GOparallel(), and previous volcano selection criteria for DEx gene products if the plotVolc() function was already run from the <a href="https://github.com/edammer/parANOVA">parANOVA.dex source</a>.
 
   - Outputs are:
     1) Z score barplots with min z ~1.96 (p<0.05) calculated from Fisher Exact Test ORA (one-tailed) p values. One barplot is
@@ -41,6 +43,7 @@ Note the current analysis output samples in the above linked .zip use June 2022 
 
 
 Wrapper code for function GOparallel():
+(All variables set in global environment, but defaults are tried if none are specified.
 ```
 ###################################################################################################################################
 ## One-Step GSA FET (R piano implementation) WITH USER PARAMETERS
@@ -126,8 +129,9 @@ cocluster=TRUE
 ######################## END OF PARAMETER VARIABLES ###################################################################################
 
 source("GOparallel-FET.R")
-GOparallel()  # parameters must be set in global environment as above; no defaults are specified for the function or passed to it.
-
+GOparallel()  # parameters are set in global environment as above; if not set, the function falls back to defaults and looks for all inputs available.
+              # priority is given to modulesInMemory
+	      
 ```
 ## Other Notes
 Requires R packages: piano, WGCNA, curl, doParallel, rvest, ontologyIndex, NMF, stringr.
