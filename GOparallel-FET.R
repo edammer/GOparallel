@@ -60,19 +60,24 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 		
 			GMTtargetPath=gsub("\\/\\/","/", gsub("(.*\\/).*$","\\1",GMTdatabaseFile) )
 			gmt.url<-paste0("http://download.baderlab.org/EM_Genesets/current_release/",species.links[input.idx],find.symbol.in.links,full.dl.file)
-			cat("Found full current GMT file:  ",gmt.url,"\n")
-			cat("Download this file to folder:  ",GMTtargetPath,"\n")
-			input.dlYN <- readline("[Y/n]?")
-			if(input.dlYN == "Y" | input.dlYN == "y" | input.dlYN == "") {
-				suppressPackageStartupMessages(require(curl,quietly=TRUE))
-				if (!dir.exists(GMTtargetPath)) dir.create(GMTtargetPath)
-				curr.dir<-getwd()
-				setwd(GMTtargetPath)
-				cat("Downloading .gmt file for ",species.links[input.idx],"...\n")
-				curl_download(url=gmt.url, destfile=full.dl.file, quiet = TRUE, mode = "w")
-				setwd(curr.dir)
-				cat("Using new downloaded .gmt file: ", paste0(GMTtargetPath,full.dl.file),"\n")
+			if(file.exists(file.path(GMTtargetPath,full.dl.file))) {
+				cat(paste0("- Found that the full current GMT file online matches a file name you already have:\n  ",full.dl.file," [skipping download]\n"))
 				GMTdatabaseFile=paste0(GMTtargetPath,full.dl.file)
+			} else {
+				cat("Found full current GMT file online:  ",gmt.url,"\n")
+				cat("Download this file to folder:  ",GMTtargetPath,"\n")
+				input.dlYN <- readline("[Y/n]?")
+				if(input.dlYN == "Y" | input.dlYN == "y" | input.dlYN == "") {
+					suppressPackageStartupMessages(require(curl,quietly=TRUE))
+					if (!dir.exists(GMTtargetPath)) dir.create(GMTtargetPath)
+					curr.dir<-getwd()
+					setwd(GMTtargetPath)
+					cat("Downloading .gmt file for ",species.links[input.idx],"...\n")
+					curl_download(url=gmt.url, destfile=full.dl.file, quiet = TRUE, mode = "w")
+					setwd(curr.dir)
+					cat("Using new downloaded .gmt file: ", paste0(GMTtargetPath,full.dl.file),"\n")
+					GMTdatabaseFile=paste0(GMTtargetPath,full.dl.file)
+				}
 			}
 		} else { stop(paste0("This is not an interactive session and required GMT file not found.\n",GMTdatabaseFile," must be downloaded interactively or prior to running this function.")) }
 	}
@@ -274,13 +279,13 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    if("net.colors" %in% colnames(modulesData)) {
 	      WGCNAinput=TRUE
 	      # .csv column before colors is assumed to contain Unique IDs (Symbol|...) unless colors are in first column; then it's assumed to be in column following colors
-	      NETcolors.idx=which("net.colors" %in% colnames(modulesData))[1]
+	      NETcolors.idx=which(colnames(modulesData) %in% "net.colors")[1]
 	      if(NETcolors.idx==1) { modulesData <- as.data.frame(modulesData[,c(NETcolors.idx+1,NETcolors.idx)]); } else { modulesData <- as.data.frame(modulesData[,c(NETcolors.idx-1,NETcolors.idx)]); }
 	    } else {
 	      if("NETcolors" %in% colnames(modulesData)) {
 	        WGCNAinput=TRUE
 	        # .csv column before colors is assumed to contain Unique IDs (Symbol|...) unless colors are in first column; then it's assumed to be in column following colors
-	        NETcolors.idx=which("NETcolors" %in% colnames(modulesData))[1]
+	        NETcolors.idx=which(colnames(modulesData) %in% "NETcolors")[1]
 	        if(NETcolors.idx==1) { modulesData <- as.data.frame(modulesData[,c(NETcolors.idx+1,NETcolors.idx)]); } else { modulesData <- as.data.frame(modulesData[,c(NETcolors.idx-1,NETcolors.idx)]); }
 	      } else {
 	        WGCNAinput=FALSE
