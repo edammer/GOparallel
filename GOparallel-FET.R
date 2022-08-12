@@ -138,6 +138,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	      if(is.logical(modulesInMemory)) {
 	        if(modulesInMemory) {
 	          cat("- modulesInMemory=TRUE.\n  We will use network module colors vector and symbols found in rownames of cleanDat table for gene lists to check for ontology enrichment.\n  Note rownames of cleanDat table must contain gene symbol, and NETcolors or net$colors vector of module color assignments must be available.\n")
+	          ANOVAgroups=FALSE
 	        } else {
 	          if(!exists("fileName")) { cat("- modulesInMemory=FALSE, ANOVAgroups not TRUE/FALSE, and no fileName variable for input either.\nOne of these must be used.  Trying ANOVAgroups=TRUE ...\n"); ANOVAgroups=TRUE; 
 	                                   if(exists("ANOVAout")) { cat("- Found ANOVAout. Proceeding to process ANOVAout table from memory, using any selections and thresholds set during volcano plotting...\n") } else { stop("\nANOVAout table not found in memory.\n\n") }
