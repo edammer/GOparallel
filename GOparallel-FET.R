@@ -1,7 +1,9 @@
 ###################################################################################################################################
 ## One-Step GSA FET (R piano implementation) WITH USER PARAMETERS
 ##  - by Eric Dammer, Divya Nandakumar
-## Nicholas Seyfried Lab Bioinformatics - for the lab - 07/27/2022 version 1.01
+## Nicholas Seyfried Lab Bioinformatics - for the lab - 10/18/2022 version 1.1
+##                                  -- (inputFile variable previously fileName and other syntax changes; now runs on R v4.2.0)
+##                                  -- cocluster now runs even if removeRedundantGOterms not set or FALSE.
 ###################################################################################################################################
 
 GOparallel <- function(dummyVar="",env=.GlobalEnv) {
@@ -100,12 +102,12 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	
 	## Check what type of input the user wants. modulesInMemory/ANOVAgroups/
 	if (!exists("ANOVAgroups") & !exists("modulesInMemory")) {
-	  if(!exists("fileName")) {
-	    cat("- No input specified as modulesInMemory=TRUE, ANOVAgroups=TRUE, and no fileName variable for input either.\n  Trying modulesInMemory=TRUE ...\n")
+	  if(!exists("inputFile")) {
+	    cat("- No input specified as modulesInMemory=TRUE, ANOVAgroups=TRUE, and no inputFile variable for input either.\n  Trying modulesInMemory=TRUE ...\n")
 	    modulesInMemory=TRUE
 	    ANOVAgroups=FALSE
 	  } else {
-	    if(!file.exists(file.path(filePath,fileName))) stop(paste0("\nfileName input specified but not found where expected, in: ",paste0(filePath,fileName),"\nDid you mean to set ANOVAgroups or modulesInMemory=TRUE?\n\n"))
+	    if(!file.exists(file.path(filePath,inputFile))) stop(paste0("\ninputFile input specified but not found where expected, in: ",paste0(filePath,inputFile),"\nDid you mean to set ANOVAgroups or modulesInMemory=TRUE?\n\n"))
 	    ANOVAgroups=FALSE
 	    modulesInMemory=FALSE
 	  }
@@ -116,17 +118,17 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	        if(exists("ANOVAout")) { cat("- Found ANOVAgroups=TRUE. Proceeding to process ANOVAout table from memory, using any selections and thresholds set during volcano plotting...\n"); modulesInMemory=FALSE; } else { if (!length(dummyVar)==1) { cat("- ANOVAout not in memory, trying to use input provided to this function.\n"); ANOVAout=as.data.frame(dummyVar); } else { stop("Variable ANOVAout not found or no input was provided.\nPlease run parANOVA.dex() function first, and save output to ANOVAout variable or pass its output to this function.\n\n") } }
 	      } else {
 	        if(exists("modulesInMemory")) if(is.logical("modulesInMemory")) if(!modulesInMemory) {  # both flags are FALSE
-	          if(!exists("fileName")) { stop("modulesInMemory=FALSE, ANOVAgroups=FALSE, and no fileName variable for input either.\nOne of these must be used.\n") }
+	          if(!exists("outFilename")) { stop("modulesInMemory=FALSE, ANOVAgroups=FALSE, and no outFilename variable for input either.\nOne of these must be used.\n") }
 	        } else {
 	          cat("- modulesInMemory=TRUE. We will use network module colors vector and symbols found in rownames of cleanDat table for gene lists to check for ontology enrichment.\n")
 	        }
 	      }
 	    } else {  #ANOVAgroups not logical TRUE/FALSE
 	      if(exists("modulesInMemory")) if(is.logical("modulesInMemory")) if(!modulesInMemory) {  # modulesInMemory is FALSE
-	        if(!exists("fileName")) { cat("- modulesInMemory=FALSE, ANOVAgroups not TRUE/FALSE, and no fileName variable for input either.\nOne of these must be used.  Trying ANOVAgroups=TRUE ...\n"); ANOVAgroups=TRUE; 
+	        if(!exists("inputFile")) { cat("- modulesInMemory=FALSE, ANOVAgroups not TRUE/FALSE, and no inputFile variable for input either.\nOne of these must be used.  Trying ANOVAgroups=TRUE ...\n"); ANOVAgroups=TRUE; 
 	                                 if(exists("ANOVAout")) { cat("- Found ANOVAout. Proceeding to process ANOVAout table from memory, using any selections and thresholds set during volcano plotting...\n") } else { stop("\nANOVAout table not found in memory.\n\n") }
-	        } else {  # fileName variable set. Does the file exist?
-	          if(file.exists(file.path(filePath,fileName))) { cat("- found fileName as set for input: ",paste0(filePath,fileName),"\n"); ANOVAgroups=FALSE; } else { stop("\nfileName as specified not found: ",paste0(filePath,fileName),"\n\n"); }
+	        } else {  # inputFile variable set. Does the file exist?
+	          if(file.exists(file.path(filePath,inputFile))) { cat("- found inputFile as set for input: ",paste0(filePath,inputFile),"\n"); ANOVAgroups=FALSE; } else { stop("\ninputFile as specified not found: ",paste0(filePath,inputFile),"\n\n"); }
 	        }
 	      } else {  # modulesInMemory is TRUE
 	        cat("- modulesInMemory=TRUE. We will use network module colors vector and symbols found in rownames of cleanDat table for gene lists to check for ontology enrichment.\n")
@@ -140,19 +142,19 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	          cat("- modulesInMemory=TRUE.\n  We will use network module colors vector and symbols found in rownames of cleanDat table for gene lists to check for ontology enrichment.\n  Note rownames of cleanDat table must contain gene symbol, and NETcolors or net$colors vector of module color assignments must be available.\n")
 	          ANOVAgroups=FALSE
 	        } else {
-	          if(!exists("fileName")) { cat("- modulesInMemory=FALSE, ANOVAgroups not TRUE/FALSE, and no fileName variable for input either.\nOne of these must be used.  Trying ANOVAgroups=TRUE ...\n"); ANOVAgroups=TRUE; 
+	          if(!exists("inputFile")) { cat("- modulesInMemory=FALSE, ANOVAgroups not TRUE/FALSE, and no inputFile variable for input either.\nOne of these must be used.  Trying ANOVAgroups=TRUE ...\n"); ANOVAgroups=TRUE; 
 	                                   if(exists("ANOVAout")) { cat("- Found ANOVAout. Proceeding to process ANOVAout table from memory, using any selections and thresholds set during volcano plotting...\n") } else { stop("\nANOVAout table not found in memory.\n\n") }
-	          } else {  # fileName variable set. Does the file exist?
-	            if(file.exists(file.path(filePath,fileName))) { cat("- found fileName as set for input: ",paste0(filePath,fileName),"\n"); ANOVAgroups=FALSE; } else { stop("\nfileName as specified not found: ",paste0(filePath,fileName),"\n\n"); }
+	          } else {  # outFilenName variable set. Does the file exist?
+	            if(file.exists(file.path(filePath,inputFile))) { cat("- found inputFile as set for input: ",paste0(filePath,inputFile),"\n"); ANOVAgroups=FALSE; } else { stop("\ninputFile as specified not found: ",paste0(filePath,inputFile),"\n\n"); }
 	          }
 	        }
 	      } else {  #modulesInMemory not logical TRUE/FALSE
-	        if(!exists("fileName")) {
-	          cat("- ANOVAgroups not set, modulesInMemory not TRUE/FALSE, and no fileName variable for input either.\nOne of these must be used.  Trying modulesInMemory=TRUE ...\n")
+	        if(!exists("inputFile")) {
+	          cat("- ANOVAgroups not set, modulesInMemory not TRUE/FALSE, and no inputFile variable for input either.\nOne of these must be used.  Trying modulesInMemory=TRUE ...\n")
 	          modulesInMemory=TRUE;
 	          ANOVAgroups=FALSE;
-	        } else {  # fileName variable set. Does the file exist?
-	          if(file.exists(file.path(filePath,fileName))) { cat("- found fileName as set for input: ",paste0(filePath,fileName),"\n"); ANOVAgroups=FALSE; modulesInMemory=FALSE; } else { stop("\nfileName as specified not found: ",paste0(filePath,fileName),"\n\n"); }
+	        } else {  # inputFile variable set. Does the file exist?
+	          if(file.exists(file.path(filePath,inputFile))) { cat("- found inputFile as set for input: ",paste0(filePath,inputFile),"\n"); ANOVAgroups=FALSE; modulesInMemory=FALSE; } else { stop("\ninputFile as specified not found: ",paste0(filePath,inputFile),"\n\n"); }
 	        }
 	      }
 	    } #else { #both ANOVAgroups and modulesInMemory do not exist; handled first above.
@@ -275,7 +277,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    modulesData <- as.data.frame(cbind(rownames(cleanDat),NETcolors))
 	    WGCNAinput=TRUE
 	  } else {
-	    modulesData <- read.csv(paste(filePath,fileName,sep=""),header=TRUE, sep=",");
+	    modulesData <- read.csv(paste(filePath,inputFile,sep=""),header=TRUE, sep=",");
 	    # check if this is a WGCNA modules/kME table containing net.colors, or NETcolors column; (otherwise it is assumed to be simple list input)
 	    if("net.colors" %in% colnames(modulesData)) {
 	      WGCNAinput=TRUE
@@ -339,7 +341,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    # We process the input file as simple lists by column in the CSV (largest list used as background)
 	    
 	    #reread the file to a list of gene symbol (or UniqueID) lists
-	    modulesData <- as.list(read.csv(paste(filePath,fileName, sep=""),sep=",", stringsAsFactors=FALSE,header=T)) 
+	    modulesData <- as.list(read.csv(paste(filePath,inputFile, sep=""),sep=",", stringsAsFactors=FALSE,header=T)) 
 	    
 	    nModules <- length(names(modulesData))
 	    semicolonsFound=FALSE
@@ -565,6 +567,12 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	GSA.FET.outSimple <- lapply(GSA.FET.resTab.list, function(x) { 
 	  ontology=stringr::str_to_title(gsub("\\%WIKIPATHWAYS_\\d*","", gsub("\\%WP_\\d*","", gsub("\\&(.*);","\\1",gsub("<\\sI>","",gsub("<I>","", gsub("(.*)\\%.*\\%.*","\\1",rownames(x))))))))
 	  ontologyType=gsub("^WP\\d*","WikiPathways", gsub(".*\\%(.*)\\%.*","\\1",rownames(x)))
+
+	  #force all caps for ontologyType of GObp GOmf GOcc (changed in downloaded GMT files Sept 2022 and/or different in mouse GMT compared to human)
+	  ontologyType=gsub("GObp","GOBP",ontologyType)
+	  ontologyType=gsub("GOmf","GOMF",ontologyType)
+	  ontologyType=gsub("GOcc","GOCC",ontologyType)
+
 	  ZscoreSign=rep(1,nrow(x))
 	  ZscoreSign[ x[,"Pvalue.Depletion"] < x[,"Pvalue.Enrichment"] ] <- -1
 	  Zscore=apply(x, 1, function(p) qnorm(min(p["Pvalue.Enrichment"], p["Pvalue.Depletion"])/2, lower.tail=FALSE))
@@ -595,6 +603,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	#13                                                SMPDB    371
 	#14                                         WikiPathways    529
 	
+
 	
 	
 	
@@ -641,14 +650,14 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	legend(x="topleft",legend = ontologyTypes, fill=color, title=" ",cex=2,horiz=F,xpd=T)
 	legend(x="topleft",legend = c(" "," "," "), title="Ontology Types",cex=2.5,horiz=F,xpd=T, bty='n', title.adj=1.4)
 	#frame()
-	
+
 	minZ<-qnorm(0.05/2, lower.tail=FALSE)
 	summary <- list()
 	for(i in c(1:(length(uniquemodcolors)))){
 		thismod=uniquemodcolors[i]	
 		tmp=GSA.FET.outSimple[[thismod]]
 	
-		if (length(tmp[,2]) == 0) next
+		if (length(tmp[,2]) == 0)  { frame(); next; }
 		tmp = tmp[,c(10,9,8,1)] ## Select GO-terms,GO-Type, Z-score,pValues (and previously, gene Lists)
 		tmp1 = tmp[order(tmp$Zscore,decreasing=T),]
 		tmp2 = tmp1[order(tmp1$ontologyType,decreasing=T),] #was tmp2
@@ -703,7 +712,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 		# tmp3$color[j] <- uniquemodcolors[i] #module color for all bars, instead of different colors by ontology type
 		} 
 	
-		if (tmp3$Zscore == F) next
+		if (tmp3$Zscore[1] == F) { frame(); next; }
 		par(mar=c(4,15,4,3))
 		xlim <- c(0,1.1*max(tmp3$Zscore))	
 		moduleTitle <- xlabels.frame[i,"Labels"]
@@ -737,7 +746,14 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	GSA.FET.GOCC.terms <- gsub("^.*\\%GO..\\%(GO:\\d*)$","\\1",rownames(GSA.FET.GOCC.Zscore))
 	minZ<-qnorm(1e-5/2, lower.tail=FALSE)
 	GSA.FET.GOCC.terms.minZreached <- apply(GSA.FET.GOCC.Zscore[,3:ncol(GSA.FET.GOCC.Zscore)],1,function(x) if (max(x)>=minZ) { TRUE } else { FALSE } )
-	GSA.FET.GOCC.minimal.terms <- minimal_set(ontology.index, terms=GSA.FET.GOCC.terms[which(GSA.FET.GOCC.terms.minZreached)])
+
+	if (removeRedundantGOterms) {
+	  GSA.FET.GOCC.minimal.terms <- minimal_set(ontology.index, terms=GSA.FET.GOCC.terms[which(GSA.FET.GOCC.terms.minZreached)])
+	} else {
+	  GSA.FET.GOCC.minimal.terms <- GSA.FET.GOCC.terms[which(GSA.FET.GOCC.terms.minZreached)]
+	  cat("- Note: removeRedundantGOterms not set or =FALSE.  You can reduce cellular components in the coclustering by setting this variable to TRUE.\n\n")
+	}
+
 	GSA.FET.GOCC.Zscore.minimal.terms <- GSA.FET.GOCC.Zscore[which(GSA.FET.GOCC.terms %in% GSA.FET.GOCC.minimal.terms),]
 	dim(GSA.FET.GOCC.Zscore)
 	# 980 rows of GO:CC terms
@@ -758,7 +774,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	wr<-colorRampPalette(c("white", "#CC3300"))
 	colvec<-c(bw(50),wr(50))
 
-	colnames(data)<-gsub("\\%GOCC\\%"," | ",colnames(data))
+	colnames(data)<-gsub("\\%GOCC\\%"," | ",gsub("GOcc","GOCC",colnames(data)))
 
 	if(!modulesInMemory) {
 	  uniquemodcolors=labels2colors(1:(ncol(GSA.FET.collapsed.outSimple.Zscore)-2))  #variable reused for color annotation here; meaningless for non-WGCNA lists
