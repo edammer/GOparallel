@@ -68,8 +68,8 @@ load("c:/BaderLabGO/PipelineSample-MEGATMT-ANOVA+Volcano-NatNeurosci2022.RData")
 
 
 ######################## EDIT THESE VARIABLES (USER PARAMETERS SET IN GLOBAL ENVIRONMENT) ############################################
-#fileName <- "ENDO_MG_TWO_WAY_LIST_NTS_v02b_forGOelite.csv"                                            #Sample File 1 - has full human background
-#fileName <- "ModuleAssignments_Jingting32TH_BOOTaspRegr_power8_MergeHeight0.07_PAMstageTRUE_ds2.csv"  #Sample File 2 - WGCNA kME table for (Dai, et al, 2019)
+#inputFile <- "ENDO_MG_TWO_WAY_LIST_NTS_v02b_forGOelite.csv"                                            #Sample File 1 - has full human background
+#inputFile <- "ModuleAssignments_Jingting32TH_BOOTaspRegr_power8_MergeHeight0.07_PAMstageTRUE_ds2.csv"  #Sample File 2 - WGCNA kME table for (Dai, et al, 2019)
             #INPUT CSV FILE - in the filePath folder.
             #Can be formatted as Kme table from WGCNA pipeline, or
             #can be a CSV of columns, one symbol or UniqueID (Symbol|...) list per column, with the LIST NAMEs in row 1
@@ -107,10 +107,10 @@ color=c("darkseagreen3","lightsteelblue1","lightpink4","goldenrod","darkorange",
 
 modulesInMemory=TRUE
             #uses cleanDat, net, and kMEdat from WGCNA systems biology pipeline already run, and these variables must be in memory
-            #input fileName will be ignored
+            #inputFile will be ignored
 ANOVAgroups=FALSE
             #if true, modulesInMemory ignored. Volcano pipeline code should already have been run!
-            #input fileName will be ignored
+            #inputFile will be ignored
 
 ############ MUST HAVE AT LEAST 2 THREADS ENABLED TO RUN ############################################################################
 
