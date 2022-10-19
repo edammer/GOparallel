@@ -751,7 +751,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  GSA.FET.GOCC.minimal.terms <- minimal_set(ontology.index, terms=GSA.FET.GOCC.terms[which(GSA.FET.GOCC.terms.minZreached)])
 	} else {
 	  GSA.FET.GOCC.minimal.terms <- GSA.FET.GOCC.terms[which(GSA.FET.GOCC.terms.minZreached)]
-	  cat("- Note: removeRedundantGOterms not set or =FALSE.  You can reduce cellular components in the coclustering by setting this variable to TRUE.\n\n")
+	  cat("- Note: removeRedundantGOterms=FALSE.  You can reduce cellular component terms in the coclustering by setting this variable to TRUE.\n\n")
 	}
 
 	GSA.FET.GOCC.Zscore.minimal.terms <- GSA.FET.GOCC.Zscore[which(GSA.FET.GOCC.terms %in% GSA.FET.GOCC.minimal.terms),]
