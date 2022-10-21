@@ -522,10 +522,12 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	clusterLocal <- makeCluster(c(rep("localhost",parallelThreads)),type="SOCK")
 	registerDoParallel(clusterLocal)
 	
-	
 	## Load GMT file
 	GSCfromGMT<-loadGSC(file=GMTdatabaseFile)
 	
+	## Be sure cluster nodes for parallel processing inherit needed variables from both .GlobalEnv and current function environment (error seen in R 4.2.1 in RStudio on Windows).
+	parallel::clusterExport(cl=clusterLocal, list("ANOVAgroups","WGCNAinput","background","DEXlistsForGO","GSCfromGMT"), envir=environment())   ## avoid error during foreach below:  Error in { : task 1 failed - "object 'ANOVAgroups' not found"
+
 	
 	## Output piano package GSA FET output tables as list assembly
 	GSA.FET.outlist<-list()
@@ -546,7 +548,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  zeroToKeep[zeroToKeep.idx]<- 0
 	  cat( paste0("\n",this.geneList, "... ") )  #" (n=",length(zeroToKeep.idx)," gene symbols) now processing: ") )
 	
-	  thislist <- runGSAhyper.twoSided(genes=background[which(zeroToKeep==0),"GeneSymbol"],universe=background[,"GeneSymbol"],gsc=GSCfromGMT,gsSizeLim=c(5,Inf),adjMethod="BH")
+	  thislist <- runGSAhyper.twoSided(genes=background[which(zeroToKeep==0),"GeneSymbol"],universe=background[,"GeneSymbol"],gsc=GSCfromGMT,gsSizeLim=c(5,Inf),adjMethod="BH",)
 	  #above line runs in time, ~30 sec/list, or 50 sec/list for .twoSided
 	  #list [[this.color]][["pvalues.greater"]] is enrichment p value vector
 	  #list [[this.color]][["padj.greater"]] is FDR vector
@@ -807,5 +809,5 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	
 	setwd(filePath)
 
-
+						
 }
