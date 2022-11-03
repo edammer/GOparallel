@@ -526,6 +526,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	GSCfromGMT<-loadGSC(file=GMTdatabaseFile)
 	
 	## Be sure cluster nodes for parallel processing inherit needed variables from both .GlobalEnv and current function environment (error seen in R 4.2.1 in RStudio on Windows).
+	if(!exists("DEXlistsForGO")) DEXlistsForGO<-list()
 	parallel::clusterExport(cl=clusterLocal, list("ANOVAgroups","WGCNAinput","background","DEXlistsForGO","GSCfromGMT"), envir=environment())   ## avoid error during foreach below:  Error in { : task 1 failed - "object 'ANOVAgroups' not found"
 
 	
