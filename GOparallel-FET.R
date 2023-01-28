@@ -183,12 +183,16 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 
 	##1a. Organize input gene lists, of the significant up and down (p<0.05) proteins in the current cleanDat
 	### List building from ANOVA-defined categories ###
+	if(!exists("corVolc")) corVolc=FALSE
 	if (ANOVAgroups) {
 
-	  if (!exists("ANOVAout")) if (!length(dummyVar)==1) { cat("- ANOVAout not in memory, trying to use input provided to this function.\n"); ANOVAout=as.data.frame(dummyVar); } else { stop("Variable ANOVAout not found or no input was provided.\nPlease run parANOVA.dex() function first, and save output to ANOVAout variable or pass its output to this function.\n\n") }
-	  if (!ncol(ANOVAout)>3) stop("\n\nInput or ANOVAout variable contents are not a data (frame) with at least 4 columns. It is not valid output from the parANOVA.dex() function.\n  Please run parANOVA.dex() first.\n\n")
+	  if(corVolc & exists("CORout")) cat("- corVolc=TRUE so getting gene lists from significant correlations in statistics table stored in variable CORout.\n"); ANOVAout<-CORout;
+	  if(corVolc & !exists("CORout")) if (!length(dummyVar)==1) { cat("- corVolc=TRUE, but CORout not in memory, using input provided to this function.\n"); ANOVAout=as.data.frame(dummyVar); } else { stop("Variable CORout not found or no input was provided.\nPlease run trait.corStat() function first, and save output to CORout variable or pass its output to this function.\n\n") }
+
+	  if (!exists("ANOVAout")) if (!length(dummyVar)==1) { cat("- ANOVAout not in memory, trying to use input provided to this function.\n"); ANOVAout=as.data.frame(dummyVar); } else { stop("Variable ANOVAout not found or no input was provided.\nPlease run parANOVA.dex() or trait.corStat() function first, and save output to ANOVAout variable or pass its output to this function.\n\n") }
+	  if (!ncol(ANOVAout)>3) stop("\n\nInput or ANOVAout variable contents are not a data (frame) with at least 4 columns. It is not valid output from the parANOVA.dex() or trait.corStat() function.\n  Please run one of these functions first.\n\n")
 	  
-	  numberOfNonComparisonColumns=length(colnames(ANOVAout)) - length(which(grepl("diff ",colnames(ANOVAout))))*2
+	  numberOfNonComparisonColumns=length(colnames(ANOVAout)) - if(!corVolc) { length(which(grepl("^diff ",colnames(ANOVAout))))*2 } else { length(which(grepl("^p ",colnames(ANOVAout))))*2 }
 	  numComp <- (length(colnames(ANOVAout)) - numberOfNonComparisonColumns) / 2 # of columns separating comparisons from matched column of log2(diffs), i.e. # of comparisons
 
 	  if (!exists("testIndexMasterList")) {
@@ -197,6 +201,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  if (testIndexMasterList[1]=="ALL" | testIndexMasterList[1]=="all" | testIndexMasterList[1]=="All") testIndexMasterList=c(3:(numComp+2))
 	  testIndexMasterList=as.integer(testIndexMasterList)
 	  if (max(testIndexMasterList)>numComp+2 | min(testIndexMasterList)<3) stop("testIndexMasterList specifies column numbers of ANOVAout that do not hold p values.\n\n")
+	  if(corVolc & exists("flip")) { cat("- Significant groups were defined by trait corrrelation. Variable flip will be ignored so positive correlations remain positive.\n"); flip=c(); }
 	  if(!exists("flip")) { cat("- No comparisons selected for flipping numerator and denominator. Variable flip=c().\n"); flip=c(); }
 
 	  if(!exists("dexComps") | !exists("comparisonIDs")) {
@@ -206,7 +211,11 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    comparisonIDs <- data.frame(dfVariable = rep(NA, length(testIndexMasterList)), Comparison = rep(NA, length(testIndexMasterList)))
 	    for (i in testIndexMasterList) {
 	      iter <- iter - 1
-	      comparisonIDs[iter, ] <- as.vector(c(paste0("dexTargets.", gsub("-", ".", colnames(ANOVAout)[i])), paste0(as.character(gsub("-", " vs ", colnames(ANOVAout)[i])))))
+	      if(!corVolc) {
+	        comparisonIDs[iter, ] <- as.vector(c(paste0("dexTargets.", gsub("-", ".", colnames(ANOVAout)[i])), paste0(as.character(gsub("-", " vs ", colnames(ANOVAout)[i])))))
+	      } else { 
+	        comparisonIDs[iter, ] <- as.vector(c(paste0("dexTargets.", gsub("^p ", "", colnames(ANOVAout)[i])), paste0(as.character(gsub("^(.*)[' '](.*)\\.(.*)$", "\\1 (\\2 in \\3 samples)", colnames(ANOVAout)[i+numComp])))))
+	      }
 	      dexComps[[comparisonIDs[iter, 1]]] <- ANOVAout
 	      if (!is.na(match(i, flip))) {
 	        dexComps[[comparisonIDs[iter, 1]]][, i + numComp] <- -1 * as.numeric(dexComps[[comparisonIDs[iter, 1]]][, i + numComp])
@@ -229,10 +238,11 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  if (!exists("sigThresh")) if(exists("sigVolcCutoff")) { sigThresh=sigVolcCutoff } else { sigThresh=0.05 }
 	  print(paste0("...Applying a minimum p value cutoff of ",sigThresh," for ANOVA lists..."))
 
+	  if(corVolc & exists("FCmin")) { cat("- Using correlation significance for defining groups. Variable FCmin will be ignored.\n"); FCmin=0; }
 	  if (!exists("FCmin")) FCmin=0
 	  cutoff=log2(1+FCmin)
 	  # shows what your cutoff for log2(FC) calculates as
-	  print(paste0("...Applying a ", FCmin*100,"% minimum fold change threshold at + and - x=", signif(cutoff,2),"..."))
+	  if(!corVolc) { print(paste0("...Applying a ", FCmin*100,"% minimum fold change threshold at + and - x=", signif(cutoff,2),"...")) }
 
 
 	  DEXlistsForGO<-list()
