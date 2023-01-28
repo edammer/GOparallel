@@ -115,7 +115,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  if(exists("ANOVAgroups")) {
 	    if(is.logical(ANOVAgroups)) {
 	      if(ANOVAgroups) {
-	        if(exists("ANOVAout")) { cat("- Found ANOVAgroups=TRUE. Proceeding to process ANOVAout table from memory, using any selections and thresholds set during volcano plotting...\n"); modulesInMemory=FALSE; } else { if (!length(dummyVar)==1) { cat("- ANOVAout not in memory, trying to use input provided to this function.\n"); ANOVAout=as.data.frame(dummyVar); } else { stop("Variable ANOVAout not found or no input was provided.\nPlease run parANOVA.dex() function first, and save output to ANOVAout variable or pass its output to this function.\n\n") } }
+	        if(exists("ANOVAout")) { cat("- Found ANOVAgroups=TRUE. Proceeding to process ANOVAout table from memory, using any selections and thresholds set during volcano plotting...\n"); modulesInMemory=FALSE; } else { if (!length(dummyVar)==1) { cat("- ANOVAout not in memory, trying to use input provided to this function (could be ANOVAout or CORout).\n"); ANOVAout=as.data.frame(dummyVar); modulesInMemory=FALSE; } else { stop("Variable ANOVAout not found or no input was provided.\nPlease run parANOVA.dex() function first, and save output to ANOVAout variable or pass its output to this function.\n\n") } }
 	      } else {
 	        if(exists("modulesInMemory")) if(is.logical("modulesInMemory")) if(!modulesInMemory) {  # both flags are FALSE
 	          if(!exists("outFilename")) { stop("modulesInMemory=FALSE, ANOVAgroups=FALSE, and no outFilename variable for input either.\nOne of these must be used.\n") }
@@ -236,7 +236,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  cat("\n")
 
 	  if (!exists("sigThresh")) if(exists("sigVolcCutoff")) { sigThresh=sigVolcCutoff } else { sigThresh=0.05 }
-	  print(paste0("...Applying a minimum p value cutoff of ",sigThresh," for ANOVA lists..."))
+	  print(paste0("...Applying a minimum p value cutoff of ",sigThresh," for ",if(corVolc) { "correlation statistics" } else { "ANOVA" }, " lists..."))
 
 	  if(corVolc & exists("FCmin")) { cat("- Using correlation significance for defining groups. Variable FCmin will be ignored.\n"); FCmin=0; }
 	  if (!exists("FCmin")) FCmin=0
