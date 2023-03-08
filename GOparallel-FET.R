@@ -1,8 +1,9 @@
 ###################################################################################################################################
 ## One-Step GSA FET (R piano implementation) WITH USER PARAMETERS
 ##  - by Eric Dammer, Divya Nandakumar
-## Nicholas Seyfried Lab Bioinformatics - for the lab - 10/18/2022 version 1.1
-##                                  -- (inputFile variable previously fileName and other syntax changes; now runs on R v4.2.0)
+## Nicholas Seyfried Lab Bioinformatics - for the lab -
+##   03/07/2023 version 1.2         -- Outputs include semicolon-separated Genes.Hit goi[goi %in% gs] for each input list/gene set
+##   10/18/2022 version 1.1         -- (inputFile variable previously fileName and other syntax changes; now runs on R v4.2.0)
 ##                                  -- cocluster now runs even if removeRedundantGOterms not set or FALSE.
 ###################################################################################################################################
 
@@ -400,8 +401,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	        stop("argument gsSizeLim should be a vector of length 2")
 	    if (missing(genes)) {
 	        stop("argument genes is required")
-	    }
-	    else {
+	    } else {
 	        genes <- as.vector(as.matrix(genes))
 	        if (!is(genes, "character")) 
 	            stop("argument genes should be a character vector")
@@ -410,8 +410,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    }
 	    if (missing(pvalues)) {
 	        pvalues <- rep(0, length(genes))
-	    }
-	    else {
+	    } else {
 	        pvalues <- as.vector(as.matrix(pvalues))
 	        if (!is(pvalues, "numeric")) 
 	            stop("argument pvalues should be a numeric vector")
@@ -423,12 +422,10 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    if (missing(pcutoff)) {
 	        if (all(pvalues %in% c(0, 1))) {
 	            pcutoff <- 0
-	        }
-	        else {
+	        } else {
 	            pcutoff <- 0.05
 	        }
-	    }
-	    else {
+	    } else {
 	        if (length(pcutoff) != 1 & !is(pcutoff, "numeric")) 
 	            stop("argument pcutoff should be a numeric of length 1")
 	        if (max(pcutoff) > 1 | min(pcutoff) < 0) 
@@ -436,8 +433,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    }
 	    if (missing(gsc)) {
 	        stop("argument gsc needs to be given")
-	    }
-	    else {
+	    } else {
 	        if (!is(gsc, "GSC")) 
 	            stop("argument gsc should be of class GSC, as returned by the loadGSC function")
 	    }
@@ -445,13 +441,11 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	        if (!all(pvalues == 0)) {
 	            universe <- genes
 	            message("Using all genes in argument genes as universe.")
-	        }
-	        else {
+	        } else {
 	            universe <- unique(unlist(gsc$gsc))
 	            message("Using all genes present in argument gsc as universe.")
 	        }
-	    }
-	    else {
+	    } else {
 	        if (!is(universe, "character")) 
 	            stop("argument universe should be a character vector")
 	        if (!all(pvalues == 0)) 
@@ -496,10 +490,10 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    padj <- rep(NA, length(gsc))
 	    names(padj) <- names(gsc)
 	    contTabList <- list()
-	    resTab <- matrix(nrow = length(gsc), ncol = 7)
+	    resTab <- matrix(nrow = length(gsc), ncol = 8)  #added 8th column to hold "Genes.Hit"
 	    colnames(resTab) <- c("Pvalue.Enrichment", "Adjusted.Enr.Pvalue", "Pvalue.Depletion",
 	        "Significant (in gene set)", "Non-significant (in gene set)", 
-	        "Significant (not in gene set)", "Non-significant (not in gene set)")
+	        "Significant (not in gene set)", "Non-significant (not in gene set)", "Genes.Hit")
 	    rownames(resTab) <- names(gsc)
 	    for (i in 1:length(gsc)) {
 	        gs <- gsc[[i]]
@@ -512,7 +506,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	        colnames(ctab) <- c("Genes in gene set", "Genes not in gene set")
 	        contTabList[[i]] <- ctab
 	        resTab[i, ] <- c(p[i], NA, p.depletion[i], sum(goi %in% gs), sum(bg %in% 
-	            gs), sum(goi %in% nogs), sum(bg %in% nogs))
+	            gs), sum(goi %in% nogs), sum(bg %in% nogs), paste0(goi[goi %in% gs],collapse=";"))  #*** added semicolon separated Genes.Hit to 8th column
 	    }
 	    padj.greater <- p.adjust(p, method = adjMethod)
 	    resTab[, 2] <- padj.greater
@@ -520,7 +514,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    res$pvalues.greater <- p
 	    res$p.adj.greater <- padj.greater
 	    res$pvalues.depletion <- p.depletion
-	    res$resTab <- resTab
+	    res$resTab <- resTab   #*** includes Genes.Hit in 8th column.
 	    res$contingencyTable <- contTabList
 	    res$gsc <- gsc
 	    return(res)
@@ -587,8 +581,8 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  ontologyType=gsub("GOcc","GOCC",ontologyType)
 
 	  ZscoreSign=rep(1,nrow(x))
-	  ZscoreSign[ x[,"Pvalue.Depletion"] < x[,"Pvalue.Enrichment"] ] <- -1
-	  Zscore=apply(x, 1, function(p) qnorm(min(p["Pvalue.Enrichment"], p["Pvalue.Depletion"])/2, lower.tail=FALSE))
+	  ZscoreSign[ as.numeric(x[,"Pvalue.Depletion"]) < as.numeric(x[,"Pvalue.Enrichment"]) ] <- -1
+	  Zscore=apply(x, 1, function(p) qnorm(min(as.numeric(p["Pvalue.Enrichment"]), as.numeric(p["Pvalue.Depletion"]))/2, lower.tail=FALSE))
 	  out=as.data.frame(x)
 	  out$Zscore=Zscore*ZscoreSign
 	  out$ontologyType=ontologyType
@@ -671,7 +665,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 		tmp=GSA.FET.outSimple[[thismod]]
 	
 		if (length(tmp[,2]) == 0)  { frame(); next; }
-		tmp = tmp[,c(10,9,8,1)] ## Select GO-terms,GO-Type, Z-score,pValues (and previously, gene Lists)
+		tmp = tmp[,c(11,10,9,1)] ## Select GO-terms,GO-Type, Z-score,pValues (and previously, gene Lists)
 		tmp1 = tmp[order(tmp$Zscore,decreasing=T),]
 		tmp2 = tmp1[order(tmp1$ontologyType,decreasing=T),] #was tmp2
 	
@@ -741,10 +735,10 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	
 	## Master Tables Generation for output to csv and for GO:CC Z score coclustering
 	
-	GSA.FET.collapsed.outSimple.Zscore <- cbind(GSA.FET.outSimple[[1]][,c("ontology","ontologyType")], matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Zscore"] )),byrow=FALSE,ncol=length(uniquemodcolors)))
-	GSA.FET.collapsed.outSimple.Pvalue.Enrichment <- cbind(GSA.FET.outSimple[[1]][,c("ontology","ontologyType")], matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Pvalue.Enrichment"] )),byrow=FALSE,ncol=length(uniquemodcolors)))
-	GSA.FET.collapsed.outSimple.Enrichment.FDR.BH <- cbind(GSA.FET.outSimple[[1]][,c("ontology","ontologyType")], matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Adjusted.Enr.Pvalue"] )),byrow=FALSE,ncol=length(uniquemodcolors)))
-	colnames(GSA.FET.collapsed.outSimple.Zscore)[3:(length(uniquemodcolors)+2)] <- colnames(GSA.FET.collapsed.outSimple.Pvalue.Enrichment)[3:(length(uniquemodcolors)+2)] <- colnames(GSA.FET.collapsed.outSimple.Enrichment.FDR.BH)[3:(length(uniquemodcolors)+2)] <- names(GSA.FET.outSimple)
+	GSA.FET.collapsed.outSimple.Zscore <- cbind(GSA.FET.outSimple[[1]][,c("ontology","ontologyType")], matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Zscore"] )),byrow=FALSE,ncol=length(uniquemodcolors)), matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Genes.Hit"] )),byrow=FALSE,ncol=length(uniquemodcolors)))
+	GSA.FET.collapsed.outSimple.Pvalue.Enrichment <- cbind(GSA.FET.outSimple[[1]][,c("ontology","ontologyType")], matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Pvalue.Enrichment"] )),byrow=FALSE,ncol=length(uniquemodcolors)), matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Genes.Hit"] )),byrow=FALSE,ncol=length(uniquemodcolors)))
+	GSA.FET.collapsed.outSimple.Enrichment.FDR.BH <- cbind(GSA.FET.outSimple[[1]][,c("ontology","ontologyType")], matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Adjusted.Enr.Pvalue"] )),byrow=FALSE,ncol=length(uniquemodcolors)), matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Genes.Hit"] )),byrow=FALSE,ncol=length(uniquemodcolors)))
+	colnames(GSA.FET.collapsed.outSimple.Zscore)[3:(length(uniquemodcolors)*2+2)] <- colnames(GSA.FET.collapsed.outSimple.Pvalue.Enrichment)[3:(length(uniquemodcolors)*2+2)] <- colnames(GSA.FET.collapsed.outSimple.Enrichment.FDR.BH)[3:(length(uniquemodcolors)*2+2)] <- c(names(GSA.FET.outSimple), paste0(names(GSA.FET.outSimple),"_Genes.Hit"))
 	
 	#write master tables
 	write.table(GSA.FET.collapsed.outSimple.Zscore,file=paste0(filePath,outFilename,"/GSA-GO-FET_",outFilename,"-Zscores.txt"),row.names=FALSE,col.names=TRUE,sep="\t", quote=FALSE)
@@ -755,7 +749,10 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 
 	if(cocluster) {
 	## For GO:CC Z score coclustering
-	GSA.FET.GOCC.Zscore <- GSA.FET.collapsed.outSimple.Zscore[which(GSA.FET.collapsed.outSimple.Zscore$ontologyType=="GOCC"),]
+	GSA.FET.GOCC.Zscore <- GSA.FET.collapsed.outSimple.Zscore[which(GSA.FET.collapsed.outSimple.Zscore$ontologyType=="GOCC"), 1:(length(uniquemodcolors)+2)]
+	temp.rownames=rownames(GSA.FET.GOCC.Zscore)
+	GSA.FET.GOCC.Zscore<-cbind(GSA.FET.GOCC.Zscore[,1:2], apply(GSA.FET.GOCC.Zscore[,3:ncol(GSA.FET.GOCC.Zscore)],2,as.numeric))
+	rownames(GSA.FET.GOCC.Zscore)<-temp.rownames
 	GSA.FET.GOCC.terms <- gsub("^.*\\%GO..\\%(GO:\\d*)$","\\1",rownames(GSA.FET.GOCC.Zscore))
 	minZ<-qnorm(1e-5/2, lower.tail=FALSE)
 	GSA.FET.GOCC.terms.minZreached <- apply(GSA.FET.GOCC.Zscore[,3:ncol(GSA.FET.GOCC.Zscore)],1,function(x) if (max(x)>=minZ) { TRUE } else { FALSE } )
@@ -778,6 +775,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	# 191 kept out of 980 (with p val max 0.00001 used to calc minZ immediately above...)
 	
 	matrixdata <- data <- t(as.matrix(GSA.FET.GOCC.Zscore.minimal.terms[,3:ncol(GSA.FET.GOCC.Zscore.minimal.terms)]))
+
 	data[matrixdata>4]<-4
 	data[matrixdata< -4] <- -4
 	 
