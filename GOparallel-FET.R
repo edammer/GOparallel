@@ -788,7 +788,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	colnames(data)<-gsub("\\%GOCC\\%"," | ",gsub("GOcc","GOCC",colnames(data)))
 
 	if(!modulesInMemory) {
-	  uniquemodcolors=labels2colors(1:(ncol(GSA.FET.collapsed.outSimple.Zscore)-2))  #variable reused for color annotation here; meaningless for non-WGCNA lists
+	  uniquemodcolors=labels2colors(1:((ncol(GSA.FET.collapsed.outSimple.Zscore)-2)/2))  #variable reused for color annotation here; meaningless for non-WGCNA lists  #/2 because Genes.Hit double the columns.
 	  myRowAnnotation=data.frame(Lists=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
 	  heatmapLegendColors<-list(Lists=factor(sort(uniquemodcolors)))
 	} else {
