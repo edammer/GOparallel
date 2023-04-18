@@ -704,6 +704,9 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	
 		summary[[i]] <- tmp3
 		
+		moduleTitle <- xlabels.frame[i,"Labels"]
+		if (is.na(tmp3$ontologyType[1])) { frame(); mtext(moduleTitle, adj=0.5, line=1, cex=0.6); next; }  #*** occurs when "no genes selected due to too strict pcutoff" in GSEA-FET piano -- error bypass; output empty frame for this comparison.
+		
 		### To color bars by mol function, cell component or biological process
 		for (j in 1:nrow(tmp3)){
 			if (tmp3$ontologyType[j] == "GOMF"){
@@ -723,10 +726,9 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 		# tmp3$color[j] <- uniquemodcolors[i] #module color for all bars, instead of different colors by ontology type
 		} 
 	
-		if (tmp3$Zscore[1] == F) { frame(); next; }
+		if (tmp3$Zscore[1] == F) { frame(); mtext(moduleTitle, adj=0.5, line=1, cex=0.6); next; }
 		par(mar=c(4,15,4,3))
 		xlim <- c(0,1.1*max(tmp3$Zscore))	
-		moduleTitle <- xlabels.frame[i,"Labels"]
 		xh <- barplot(tmp3$Zscore,horiz = TRUE,width =0.85,las=1,main=moduleTitle, xlim=xlim,col=tmp3$color,cex.axis=0.7,xlab="Z Score",cex.lab=0.9,cex.main=0.95,ylim=c(0,nrow(tmp3)+0.8))
 		abline(v=minZ,col="red", cex.axis = 0.5)
 		axis(2, at=xh, labels = tmp3$ontology, tick=FALSE, las =2, line =-0.5, cex.axis = 0.7) 
