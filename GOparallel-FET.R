@@ -197,11 +197,15 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  numComp <- (length(colnames(ANOVAout)) - numberOfNonComparisonColumns) / 2 # of columns separating comparisons from matched column of log2(diffs), i.e. # of comparisons
 
 	  if (!exists("testIndexMasterList")) {
-	    if(exists("selectComps")) { cat("- Volcano (plotVolc) selection of pairwise comparisons in ANOVAout taken from variable selectComps.\n"); testIndexMasterList=selectComps; } else { cat("- No comparison p value columns previously selected by running plotVolc(). Using ALL comparisons.\n"); testIndexMasterList="ALL"; }
+	    if(exists("selectComps")) { cat("- Volcano (plotVolc) selection of pairwise comparisons in ANOVAout may apply from the variable selectComps.\n"); testIndexMasterList=selectComps; } else { cat("- No comparison p value columns previously selected by running plotVolc(). Using ALL comparisons.\n"); testIndexMasterList="ALL"; }
+	  }
+	  if (max(testIndexMasterList)>numComp+2 | min(testIndexMasterList)<3) {
+	    cat(" - Selected comparison p value columns numbers may not reference valid integer p value column indexes of ANOVAout (or CORout).\n   Output will be for all valid comparisons or correlation(s).\n")
+	    testIndexMasterList="ALL"
 	  }
 	  if (testIndexMasterList[1]=="ALL" | testIndexMasterList[1]=="all" | testIndexMasterList[1]=="All") testIndexMasterList=c(3:(numComp+2))
 	  testIndexMasterList=as.integer(testIndexMasterList)
-	  if (max(testIndexMasterList)>numComp+2 | min(testIndexMasterList)<3) stop("testIndexMasterList specifies column numbers of ANOVAout that do not hold p values.\n\n")
+
 	  if(corVolc & exists("flip")) { cat("- Significant groups were defined by trait corrrelation. Variable flip will be ignored so positive correlations remain positive.\n"); flip=c(); }
 	  if(!exists("flip")) { cat("- No comparisons selected for flipping numerator and denominator. Variable flip=c().\n"); flip=c(); }
 
