@@ -43,7 +43,7 @@ Note the current analysis output samples in the above linked .zip use June 2022 
 
 
 Wrapper code for function GOparallel():
-(All variables set in global environment, but defaults are tried if none are specified.
+(All variables set in global environment, but defaults are tried if none are specified).
 ```
 ###################################################################################################################################
 ## One-Step GSA FET (R piano implementation) WITH USER PARAMETERS
