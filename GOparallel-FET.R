@@ -8,6 +8,8 @@
 ###################################################################################################################################
 
 GOparallel <- function(dummyVar="",env=.GlobalEnv) {
+	minHitsPerOntology=5  # ontologies hit by fewer than this number of genes in an input list will not be plotted in Z score barplots.
+
 	if(!exists("filePath")) { cat(paste0("- filePath not set. Using current working directory: ",getwd(),"\n")); filePath=getwd(); }
 	## Clean out spaces and escaped backslashes from folder paths (folder names with spaces should not be used on non-windows systems with this script)
 	#filePath=paste0(paste( sapply(do.call(c,strsplit(filePath,"[/\\]")),function(x) { if (grepl(" ",x)) { gsub(x,paste0(substr(gsub(" ","",x),1,6),"~1"),x) } else { x } } ),collapse="/"),"/")
@@ -557,7 +559,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  zeroToKeep[zeroToKeep.idx]<- 0
 	  cat( paste0("\n",this.geneList, "... ") )  #" (n=",length(zeroToKeep.idx)," gene symbols) now processing: ") )
 	
-	  thislist <- runGSAhyper.twoSided(genes=background[which(zeroToKeep==0),"GeneSymbol"],universe=background[,"GeneSymbol"],gsc=GSCfromGMT,gsSizeLim=c(5,Inf),adjMethod="BH",)
+	  thislist <- runGSAhyper.twoSided(genes=background[which(zeroToKeep==0),"GeneSymbol"],universe=background[,"GeneSymbol"],gsc=GSCfromGMT,gsSizeLim=c(minHitsPerOntology,Inf),adjMethod="BH",)
 	  #above line runs in time, ~30 sec/list, or 50 sec/list for .twoSided
 	  #list [[this.color]][["pvalues.greater"]] is enrichment p value vector
 	  #list [[this.color]][["padj.greater"]] is FDR vector
@@ -667,9 +669,11 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	for(i in c(1:(length(uniquemodcolors)))){
 		thismod=uniquemodcolors[i]	
 		tmp=GSA.FET.outSimple[[thismod]]
-	
-		if (length(tmp[,2]) == 0)  { frame(); next; }
-		tmp = tmp[,c(11,10,9,1)] ## Select GO-terms,GO-Type, Z-score,pValues (and previously, gene Lists)
+
+		filter.minHits.idx<-which(tmp[,"Significant (in gene set)"]>=minHitsPerOntology)
+		if (length(tmp[,2]) == 0 | length(filter.minHits.idx) == 0)  { frame(); next; }
+		tmp = tmp[filter.minHits.idx,c(11,10,9,1)] ## Select GO-terms,GO-Type, Z-score,pValues (and previously, gene Lists)
+
 		tmp1 = tmp[order(tmp$Zscore,decreasing=T),]
 		tmp2 = tmp1[order(tmp1$ontologyType,decreasing=T),] #was tmp2
 	
@@ -824,5 +828,5 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	
 	setwd(filePath)
 
-						
+
 }
