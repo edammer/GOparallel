@@ -475,7 +475,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    pvalues[pvalues == 0] <- -1e-10
 	    goi <- genes[pvalues < pcutoff]
 	    if (length(goi) < 1) 
-	        stop("no genes selected due to too strict pcutoff")
+	        cat("\nrunGSEAhyper: no genes selected due to too strict pcutoff.\n")
 	    bg <- universe[!universe %in% goi]
 	    gsc <- gsc$gsc
 	    delInd <- vector()
