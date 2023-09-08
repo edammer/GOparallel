@@ -474,8 +474,13 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    }
 	    pvalues[pvalues == 0] <- -1e-10
 	    goi <- genes[pvalues < pcutoff]
-	    if (length(goi) < 1) 
-	        cat("\nrunGSEAhyper: no genes selected due to too strict pcutoff.\n")
+	    if (length(goi) < 1) {
+	        cat("\nrunGSEAhyper: no genes selected due to too strict pcutoff. (no genes of interest made an input list)\n")
+	        res<-list()
+	        res$resTab <- NA
+	        res$gsc <- NA
+	        return(res)
+	    }
 	    bg <- universe[!universe %in% goi]
 	    gsc <- gsc$gsc
 	    delInd <- vector()
@@ -578,28 +583,33 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	
 	#Add signed Zscore, pull out ontologyType, ontology (description, title case)
 	GSA.FET.outSimple <- lapply(GSA.FET.resTab.list, function(x) { 
-	  ontology=stringr::str_to_title(gsub("\\%WIKIPATHWAYS_\\d*","", gsub("\\%WP_\\d*","", gsub("\\&(.*);","\\1",gsub("<\\sI>","",gsub("<I>","", gsub("(.*)\\%.*\\%.*","\\1",rownames(x))))))))
-	  ontologyType=gsub("^WP\\d*","WikiPathways", gsub(".*\\%(.*)\\%.*","\\1",rownames(x)))
+	  if(is.na(x[1])) {    #*** occurs when "no genes selected due to too strict pcutoff" in GSEA-FET piano
+	    NA
+	  } else {
+	    ontology=stringr::str_to_title(gsub("\\%WIKIPATHWAYS_\\d*","", gsub("\\%WP_\\d*","", gsub("\\&(.*);","\\1",gsub("<\\sI>","",gsub("<I>","", gsub("(.*)\\%.*\\%.*","\\1",rownames(x))))))))
+	    ontologyType=gsub("^WP\\d*","WikiPathways", gsub(".*\\%(.*)\\%.*","\\1",rownames(x)))
 
-	  #force all caps for ontologyType of GObp GOmf GOcc (changed in downloaded GMT files Sept 2022 and/or different in mouse GMT compared to human)
-	  ontologyType=gsub("GObp","GOBP",ontologyType)
-	  ontologyType=gsub("GOmf","GOMF",ontologyType)
-	  ontologyType=gsub("GOcc","GOCC",ontologyType)
+	    #force all caps for ontologyType of GObp GOmf GOcc (changed in downloaded GMT files Sept 2022 and/or different in mouse GMT compared to human)
+	    ontologyType=gsub("GObp","GOBP",ontologyType)
+	    ontologyType=gsub("GOmf","GOMF",ontologyType)
+	    ontologyType=gsub("GOcc","GOCC",ontologyType)
 
-	  ZscoreSign=rep(1,nrow(x))
-	  ZscoreSign[ as.numeric(x[,"Pvalue.Depletion"]) < as.numeric(x[,"Pvalue.Enrichment"]) ] <- -1
-	  Zscore=apply(x, 1, function(p) qnorm(min(as.numeric(p["Pvalue.Enrichment"]), as.numeric(p["Pvalue.Depletion"]))/2, lower.tail=FALSE))
-	  out=as.data.frame(x)
-	  out$Zscore=Zscore*ZscoreSign
-	  out$ontologyType=ontologyType
-	  out$ontology=ontology
-	  out })
+	    ZscoreSign=rep(1,nrow(x))
+	    ZscoreSign[ as.numeric(x[,"Pvalue.Depletion"]) < as.numeric(x[,"Pvalue.Enrichment"]) ] <- -1
+	    Zscore=apply(x, 1, function(p) qnorm(min(as.numeric(p["Pvalue.Enrichment"]), as.numeric(p["Pvalue.Depletion"]))/2, lower.tail=FALSE))
+	    out=as.data.frame(x)
+	    out$Zscore=Zscore*ZscoreSign
+	    out$ontologyType=ontologyType
+	    out$ontology=ontology
+	    out
+	  }
+	})
 	
 	#head(GSA.FET.outSimple[[1]])
 	
 	
 	## Available Ontology Types
-	 data.frame(x=table( gsub("^WP\\d*","WikiPathways",gsub(".*\\%(.*)\\%.*","\\1",rownames(GSA.FET.resTab.list[[1]])))))
+#	 data.frame(x=table( gsub("^WP\\d*","WikiPathways",gsub(".*\\%(.*)\\%.*","\\1",rownames(GSA.FET.resTab.list[[1]])))))
 	#                                                 x.Var1 x.Freq
 	#1                                                BIOCYC     99
 	#2                                                  GOBP   6432
@@ -669,7 +679,13 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	for(i in c(1:(length(uniquemodcolors)))){
 		thismod=uniquemodcolors[i]	
 		tmp=GSA.FET.outSimple[[thismod]]
-
+#		cat(unlist(tmp))
+		if (is.na(tmp[[1]][1])) {    #*** occurs when "no genes selected due to too strict pcutoff" in GSEA-FET piano -- error bypass; output empty frame for this comparison.
+		  moduleTitle <- xlabels.frame[i,"Labels"]
+		  frame();
+		  mtext(paste0(moduleTitle,"\n-no genes made it into input"), adj=0.5, line=1, cex=0.85, font=2);
+		  next;
+		}
 		filter.minHits.idx<-which(tmp[,"Significant (in gene set)"]>=minHitsPerOntology)
 		if (length(tmp[,2]) == 0 | length(filter.minHits.idx) == 0)  { frame(); next; }
 		tmp = tmp[filter.minHits.idx,c(11,10,9,1)] ## Select GO-terms,GO-Type, Z-score,pValues (and previously, gene Lists)
@@ -709,7 +725,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 		summary[[i]] <- tmp3
 		
 		moduleTitle <- xlabels.frame[i,"Labels"]
-		if (is.na(tmp3$ontologyType[1])) { frame(); mtext(moduleTitle, adj=0.5, line=1, cex=0.6); next; }  #*** occurs when "no genes selected due to too strict pcutoff" in GSEA-FET piano -- error bypass; output empty frame for this comparison.
+		if (is.na(tmp3$ontologyType[1])) { frame(); mtext(paste0(moduleTitle,"\n-no terms hit"), adj=0.5, line=1, cex=0.85, font=2); next; }  #*** occurs when "no genes selected due to too strict pcutoff" in GSEA-FET piano -- error bypass; output empty frame for this comparison.
 		
 		### To color bars by mol function, cell component or biological process
 		for (j in 1:nrow(tmp3)){
@@ -730,7 +746,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 		# tmp3$color[j] <- uniquemodcolors[i] #module color for all bars, instead of different colors by ontology type
 		} 
 	
-		if (tmp3$Zscore[1] == F) { frame(); mtext(moduleTitle, adj=0.5, line=1, cex=0.6); next; }
+		if (tmp3$Zscore[1] == F) { frame(); mtext(paste0(moduleTitle,"\n-no terms hit"), adj=0.5, line=1, cex=0.85, font=2); next; }
 		par(mar=c(4,15,4,3))
 		xlim <- c(0,1.1*max(tmp3$Zscore))	
 		xh <- barplot(tmp3$Zscore,horiz = TRUE,width =0.85,las=1,main=moduleTitle, xlim=xlim,col=tmp3$color,cex.axis=0.7,xlab="Z Score",cex.lab=0.9,cex.main=0.95,ylim=c(0,nrow(tmp3)+0.8))
@@ -744,87 +760,98 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	
 	
 	## Master Tables Generation for output to csv and for GO:CC Z score coclustering
-	
-	GSA.FET.collapsed.outSimple.Zscore <- cbind(GSA.FET.outSimple[[1]][,c("ontology","ontologyType")], matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Zscore"] )),byrow=FALSE,ncol=length(uniquemodcolors)), matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Genes.Hit"] )),byrow=FALSE,ncol=length(uniquemodcolors)))
-	GSA.FET.collapsed.outSimple.Pvalue.Enrichment <- cbind(GSA.FET.outSimple[[1]][,c("ontology","ontologyType")], matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Pvalue.Enrichment"] )),byrow=FALSE,ncol=length(uniquemodcolors)), matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Genes.Hit"] )),byrow=FALSE,ncol=length(uniquemodcolors)))
-	GSA.FET.collapsed.outSimple.Enrichment.FDR.BH <- cbind(GSA.FET.outSimple[[1]][,c("ontology","ontologyType")], matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Adjusted.Enr.Pvalue"] )),byrow=FALSE,ncol=length(uniquemodcolors)), matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Genes.Hit"] )),byrow=FALSE,ncol=length(uniquemodcolors)))
-	colnames(GSA.FET.collapsed.outSimple.Zscore)[3:(length(uniquemodcolors)*2+2)] <- colnames(GSA.FET.collapsed.outSimple.Pvalue.Enrichment)[3:(length(uniquemodcolors)*2+2)] <- colnames(GSA.FET.collapsed.outSimple.Enrichment.FDR.BH)[3:(length(uniquemodcolors)*2+2)] <- c(names(GSA.FET.outSimple), paste0(names(GSA.FET.outSimple),"_Genes.Hit"))
-	
-	#write master tables
-	write.table(GSA.FET.collapsed.outSimple.Zscore,file=paste0(filePath,outFilename,"/GSA-GO-FET_",outFilename,"-Zscores.txt"),row.names=FALSE,col.names=TRUE,sep="\t", quote=FALSE)
-	write.table(GSA.FET.collapsed.outSimple.Pvalue.Enrichment,file=paste0(filePath,outFilename,"/GSA-GO-FET_",outFilename,"-Enr.Pvalues.txt"),row.names=FALSE,col.names=TRUE,sep="\t", quote=FALSE)
-	write.table(GSA.FET.collapsed.outSimple.Enrichment.FDR.BH,file=paste0(filePath,outFilename,"/GSA-GO-FET_",outFilename,"-Enr.FDR.BH.txt"),row.names=FALSE,col.names=TRUE,sep="\t", quote=FALSE)
-	
-	if(!exists("cocluster")) cocluster=TRUE
 
-	if(cocluster) {
-	## For GO:CC Z score coclustering
-	GSA.FET.GOCC.Zscore <- GSA.FET.collapsed.outSimple.Zscore[which(GSA.FET.collapsed.outSimple.Zscore$ontologyType=="GOCC"), 1:(length(uniquemodcolors)+2)]
-	temp.rownames=rownames(GSA.FET.GOCC.Zscore)
-	GSA.FET.GOCC.Zscore<-cbind(GSA.FET.GOCC.Zscore[,1:2], apply(GSA.FET.GOCC.Zscore[,3:ncol(GSA.FET.GOCC.Zscore)],2,as.numeric))
-	rownames(GSA.FET.GOCC.Zscore)<-temp.rownames
-	GSA.FET.GOCC.terms <- gsub("^.*\\%GO..\\%(GO:\\d*)$","\\1",rownames(GSA.FET.GOCC.Zscore))
-	minZ<-qnorm(1e-5/2, lower.tail=FALSE)
-	GSA.FET.GOCC.terms.minZreached <- apply(GSA.FET.GOCC.Zscore[,3:ncol(GSA.FET.GOCC.Zscore)],1,function(x) if (max(x)>=minZ) { TRUE } else { FALSE } )
-
-	if (removeRedundantGOterms) {
-	  GSA.FET.GOCC.minimal.terms <- minimal_set(ontology.index, terms=GSA.FET.GOCC.terms[which(GSA.FET.GOCC.terms.minZreached)])
-	} else {
-	  GSA.FET.GOCC.minimal.terms <- GSA.FET.GOCC.terms[which(GSA.FET.GOCC.terms.minZreached)]
-	  cat("- Note: removeRedundantGOterms=FALSE.  You can reduce cellular component terms in the coclustering by setting this variable to TRUE.\n\n")
+	for (this.input in names(GSA.FET.outSimple)) {
+	  if (length(GSA.FET.outSimple[[this.input]])==1) { if (is.na(GSA.FET.outSimple[[this.input]][1])) {
+	    cat(paste0("x - ",this.input," list had no genes and is excluded form table output.\n"))
+	    GSA.FET.outSimple[[this.input]]<-NULL
+	    uniquemodcolors<-uniquemodcolors[-which(uniquemodcolors==this.input)]
+	  }}
 	}
-
-	GSA.FET.GOCC.Zscore.minimal.terms <- GSA.FET.GOCC.Zscore[which(GSA.FET.GOCC.terms %in% GSA.FET.GOCC.minimal.terms),]
-	dim(GSA.FET.GOCC.Zscore)
-	# 980 rows of GO:CC terms
-	length(which(GSA.FET.GOCC.terms.minZreached))
-	# 596 have at least 1 Z score above minZ set immediately above (with p val max 0.001 used to calc minZ immediately above...)
-	# 381 at p val max 0.00001
-	length(GSA.FET.GOCC.minimal.terms)
-	# 329 kept out of 980 (with p val max 0.001 used to calc minZ immediately above...)
-	# 191 kept out of 980 (with p val max 0.00001 used to calc minZ immediately above...)
 	
-	matrixdata <- data <- t(as.matrix(GSA.FET.GOCC.Zscore.minimal.terms[,3:ncol(GSA.FET.GOCC.Zscore.minimal.terms)]))
-
-	data[matrixdata>4]<-4
-	data[matrixdata< -4] <- -4
-	 
-	#NMF - initial approach
-	suppressPackageStartupMessages(require(WGCNA,quietly=TRUE))
-	bw<-colorRampPalette(c("#0058CC", "white"))
-	wr<-colorRampPalette(c("white", "#CC3300"))
-	colvec<-c(bw(50),wr(50))
-
-	colnames(data)<-gsub("\\%GOCC\\%"," | ",gsub("GOcc","GOCC",colnames(data)))
-
-	if(!modulesInMemory) {
-	  uniquemodcolors=labels2colors(1:((ncol(GSA.FET.collapsed.outSimple.Zscore)-2)/2))  #variable reused for color annotation here; meaningless for non-WGCNA lists  #/2 because Genes.Hit double the columns.
-	  myRowAnnotation=data.frame(Lists=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
-	  heatmapLegendColors<-list(Lists=factor(sort(uniquemodcolors)))
+	if(length(uniquemodcolors)<1) {
+	  cat("x - no lists had any genes/were enriched in any terms below cutoffs. Skipping output of tables, etc.\n")
 	} else {
-	  heatmapLegendColors<-list(Modules=sort(uniquemodcolors))
-	  myRowAnnotation=data.frame(Modules=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
-	}
+	  GSA.FET.collapsed.outSimple.Zscore <- cbind(GSA.FET.outSimple[[1]][,c("ontology","ontologyType")], matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Zscore"] )),byrow=FALSE,ncol=length(uniquemodcolors)), matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Genes.Hit"] )),byrow=FALSE,ncol=length(uniquemodcolors)))
+	  GSA.FET.collapsed.outSimple.Pvalue.Enrichment <- cbind(GSA.FET.outSimple[[1]][,c("ontology","ontologyType")], matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Pvalue.Enrichment"] )),byrow=FALSE,ncol=length(uniquemodcolors)), matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Genes.Hit"] )),byrow=FALSE,ncol=length(uniquemodcolors)))
+	  GSA.FET.collapsed.outSimple.Enrichment.FDR.BH <- cbind(GSA.FET.outSimple[[1]][,c("ontology","ontologyType")], matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Adjusted.Enr.Pvalue"] )),byrow=FALSE,ncol=length(uniquemodcolors)), matrix(unlist(lapply(GSA.FET.outSimple, function(x) x[,"Genes.Hit"] )),byrow=FALSE,ncol=length(uniquemodcolors)))
+	  colnames(GSA.FET.collapsed.outSimple.Zscore)[3:(length(uniquemodcolors)*2+2)] <- colnames(GSA.FET.collapsed.outSimple.Pvalue.Enrichment)[3:(length(uniquemodcolors)*2+2)] <- colnames(GSA.FET.collapsed.outSimple.Enrichment.FDR.BH)[3:(length(uniquemodcolors)*2+2)] <- c(names(GSA.FET.outSimple), paste0(names(GSA.FET.outSimple),"_Genes.Hit"))
+	  
+	  #write master tables
+	  write.table(GSA.FET.collapsed.outSimple.Zscore,file=paste0(filePath,outFilename,"/GSA-GO-FET_",outFilename,"-Zscores.txt"),row.names=FALSE,col.names=TRUE,sep="\t", quote=FALSE)
+	  write.table(GSA.FET.collapsed.outSimple.Pvalue.Enrichment,file=paste0(filePath,outFilename,"/GSA-GO-FET_",outFilename,"-Enr.Pvalues.txt"),row.names=FALSE,col.names=TRUE,sep="\t", quote=FALSE)
+	  write.table(GSA.FET.collapsed.outSimple.Enrichment.FDR.BH,file=paste0(filePath,outFilename,"/GSA-GO-FET_",outFilename,"-Enr.FDR.BH.txt"),row.names=FALSE,col.names=TRUE,sep="\t", quote=FALSE)
+	
+	  if(!exists("cocluster")) cocluster=TRUE
 
-	suppressPackageStartupMessages(require(NMF,quietly=TRUE))  # for aheatmap
-	pdf(file=paste0("GO_cc_clustering_from_GSA_FET_Z-",filenameFinal,".pdf"),width=18.5,height=18,onefile=FALSE)
-	  aheatmap(x=data, ## Numeric Matrix
-	         main="Co-clustering with manhattan distance function, ward metric",
-	#         annCol=metdat,  ## Color swatch and legend annotation of columns/samples and rows (not used)
-	         annRow=myRowAnnotation,
-	         annColors=heatmapLegendColors,
-	         border=list(matrix = TRUE),
-	         scale="none",  ## row, column, or none
-	         distfun="manhattan",hclustfun="ward", ## Clustering options
-	         cexRow=0.8, ## Character sizes
-	         cexCol=0.8,
-	         col=colvec,   #c("white","black"), ## Color map scheme
-	         treeheight=80,
-	         Rowv=TRUE,Colv=TRUE) ## Cluster columns
-	dev.off()
+	  if(cocluster) {
+	  ## For GO:CC Z score coclustering
+	  GSA.FET.GOCC.Zscore <- GSA.FET.collapsed.outSimple.Zscore[which(GSA.FET.collapsed.outSimple.Zscore$ontologyType=="GOCC"), 1:(length(uniquemodcolors)+2)]
+	  temp.rownames=rownames(GSA.FET.GOCC.Zscore)
+	  GSA.FET.GOCC.Zscore<-cbind(GSA.FET.GOCC.Zscore[,1:2], apply(GSA.FET.GOCC.Zscore[,3:ncol(GSA.FET.GOCC.Zscore)],2,as.numeric))
+	  rownames(GSA.FET.GOCC.Zscore)<-temp.rownames
+	  GSA.FET.GOCC.terms <- gsub("^.*\\%GO..\\%(GO:\\d*)$","\\1",rownames(GSA.FET.GOCC.Zscore))
+	  minZ<-qnorm(1e-5/2, lower.tail=FALSE)
+	  GSA.FET.GOCC.terms.minZreached <- apply(GSA.FET.GOCC.Zscore[,3:ncol(GSA.FET.GOCC.Zscore)],1,function(x) if (max(x)>=minZ) { TRUE } else { FALSE } )
+
+	  if (removeRedundantGOterms) {
+	    GSA.FET.GOCC.minimal.terms <- minimal_set(ontology.index, terms=GSA.FET.GOCC.terms[which(GSA.FET.GOCC.terms.minZreached)])
+	  } else {
+	    GSA.FET.GOCC.minimal.terms <- GSA.FET.GOCC.terms[which(GSA.FET.GOCC.terms.minZreached)]
+	    cat("- Note: removeRedundantGOterms=FALSE.  You can reduce cellular component terms in the coclustering by setting this variable to TRUE.\n\n")
+	  }
+
+	  GSA.FET.GOCC.Zscore.minimal.terms <- GSA.FET.GOCC.Zscore[which(GSA.FET.GOCC.terms %in% GSA.FET.GOCC.minimal.terms),]
+	  dim(GSA.FET.GOCC.Zscore)
+	  # 980 rows of GO:CC terms
+	  length(which(GSA.FET.GOCC.terms.minZreached))
+	  # 596 have at least 1 Z score above minZ set immediately above (with p val max 0.001 used to calc minZ immediately above...)
+	  # 381 at p val max 0.00001
+	  length(GSA.FET.GOCC.minimal.terms)
+	  # 329 kept out of 980 (with p val max 0.001 used to calc minZ immediately above...)
+	  # 191 kept out of 980 (with p val max 0.00001 used to calc minZ immediately above...)
 	
-	} # end if (cocluster) 
-	
+	  matrixdata <- data <- t(as.matrix(GSA.FET.GOCC.Zscore.minimal.terms[,3:ncol(GSA.FET.GOCC.Zscore.minimal.terms)]))
+
+	  data[matrixdata>4]<-4
+	  data[matrixdata< -4] <- -4
+	  
+	  #NMF - initial approach
+	  suppressPackageStartupMessages(require(WGCNA,quietly=TRUE))
+	  bw<-colorRampPalette(c("#0058CC", "white"))
+	  wr<-colorRampPalette(c("white", "#CC3300"))
+	  colvec<-c(bw(50),wr(50))
+
+	  colnames(data)<-gsub("\\%GOCC\\%"," | ",gsub("GOcc","GOCC",colnames(data)))
+
+	  if(!modulesInMemory) {
+	    uniquemodcolors=labels2colors(1:((ncol(GSA.FET.collapsed.outSimple.Zscore)-2)/2))  #variable reused for color annotation here; meaningless for non-WGCNA lists  #/2 because Genes.Hit double the columns.
+	    myRowAnnotation=data.frame(Lists=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
+	    heatmapLegendColors<-list(Lists=factor(sort(uniquemodcolors)))
+	  } else {
+	    heatmapLegendColors<-list(Modules=sort(uniquemodcolors))
+	    myRowAnnotation=data.frame(Modules=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
+	  }
+
+	  suppressPackageStartupMessages(require(NMF,quietly=TRUE))  # for aheatmap
+	  pdf(file=paste0("GO_cc_clustering_from_GSA_FET_Z-",filenameFinal,".pdf"),width=18.5,height=18,onefile=FALSE)
+	    aheatmap(x=data, ## Numeric Matrix
+	           main="Co-clustering with manhattan distance function, ward metric",
+	  #         annCol=metdat,  ## Color swatch and legend annotation of columns/samples and rows (not used)
+	           annRow=myRowAnnotation,
+	           annColors=heatmapLegendColors,
+	           border=list(matrix = TRUE),
+	           scale="none",  ## row, column, or none
+	           distfun="manhattan",hclustfun="ward", ## Clustering options
+	           cexRow=0.8, ## Character sizes
+	           cexCol=0.8,
+	           col=colvec,   #c("white","black"), ## Color map scheme
+	           treeheight=80,
+	           Rowv=TRUE,Colv=TRUE) ## Cluster columns
+	  dev.off()
+	  
+	  } # end if (cocluster) 
+	} # end if(length(uniquemodcolors)<1)
 	
 	setwd(filePath)
 
