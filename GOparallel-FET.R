@@ -234,10 +234,10 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  # ls(dexComps)   # list elements are dataframes with the DEX entries for that comparison
 
 
-	  ANOVAout$Symbol <- do.call("rbind", strsplit(as.character(rownames(ANOVAout)), "[|]"))[, 1]
+	  ANOVAout$Symbol <- suppressWarnings(do.call("rbind", strsplit(as.character(rownames(ANOVAout)), "[|]"))[, 1])
 	  if(length(which(grepl(";",ANOVAout$Symbol)))>0) {
 	    cat("- *Found some gene symbols have semicolons! Splitting these and keeping only symbol *before* semicolon.\n")
-	    ANOVAout$Symbol<-do.call("rbind",strsplit(as.character(ANOVAout$Symbol), "[;]"))[,1]
+	    ANOVAout$Symbol<-suppressWarnings(do.call("rbind",strsplit(as.character(ANOVAout$Symbol), "[;]"))[,1])
 	  }
 
 	  cat("\n")
@@ -325,10 +325,10 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    
 	    #Split out symbols from UniprotIDs, keep symbols in column 1
 	    rownames(modulesData)<-modulesData$Unique.ID
-	    modulesData$Unique.ID<-do.call("rbind",strsplit(as.character(modulesData$Unique.ID), "[|]"))[,1]
+	    modulesData$Unique.ID<-suppressWarnings(do.call("rbind",strsplit(as.character(modulesData$Unique.ID), "[|]"))[,1])
 	    if(length(which(grepl(";",modulesData$Unique.ID)))>0) {
 	      cat("- *Found some gene symbols have semicolons! Splitting these and keeping only symbol *before* semicolon.\n")
-	      modulesData$Unique.ID<-do.call("rbind",strsplit(as.character(modulesData$Unique.ID), "[;]"))[,1]
+	      modulesData$Unique.ID<-suppressWarnings(do.call("rbind",strsplit(as.character(modulesData$Unique.ID), "[;]"))[,1])
 	    }
 	    
 	    ## Creating background file for GO Elite analysis
@@ -365,9 +365,9 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    for (a in 1:nModules) {
 	      modulesData[[a]] <- unique(modulesData[[a]][modulesData[[a]] != ""])
 	      modulesData[[a]] <- modulesData[[a]][!is.na(modulesData[[a]])]
-	      modulesData[[a]] <- do.call("rbind",strsplit(as.character(modulesData[[a]]), "[|]"))[,1]
+	      modulesData[[a]] <- suppressWarnings(do.call("rbind",strsplit(as.character(modulesData[[a]]), "[|]"))[,1])
 	      if(length(which(grepl(";",modulesData[[a]])))>0) {
-	        modulesData[[a]]<-do.call("rbind",strsplit(as.character(modulesData[[a]]), "[;]"))[,1]
+	        modulesData[[a]]<-suppressWarnings(do.call("rbind",strsplit(as.character(modulesData[[a]]), "[;]"))[,1])
 	      }
 	    }
 	    if(semicolonsFound) cat("- *Found some gene symbols have semicolons! Splitting these and keeping only symbol *before* semicolon.\n")
@@ -810,50 +810,53 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  length(GSA.FET.GOCC.minimal.terms)
 	  # 329 kept out of 980 (with p val max 0.001 used to calc minZ immediately above...)
 	  # 191 kept out of 980 (with p val max 0.00001 used to calc minZ immediately above...)
-	
+	  
 	  matrixdata <- data <- t(as.matrix(GSA.FET.GOCC.Zscore.minimal.terms[,3:ncol(GSA.FET.GOCC.Zscore.minimal.terms)]))
+          
+          if(ncol(data)==0) cat("- No significant Cellular Component ontologies found. Skipping GOCC Cluster Heatmap output.\n\n")
+          while(!ncol(data)==0) {
 
-	  data[matrixdata>4]<-4
-	  data[matrixdata< -4] <- -4
-	  
-	  #NMF - initial approach
-	  suppressPackageStartupMessages(require(WGCNA,quietly=TRUE))
-	  bw<-colorRampPalette(c("#0058CC", "white"))
-	  wr<-colorRampPalette(c("white", "#CC3300"))
-	  colvec<-c(bw(50),wr(50))
+	    data[matrixdata>4]<-4
+            data[matrixdata< -4] <- -4
+            
+            #NMF - initial approach
+            suppressPackageStartupMessages(require(WGCNA,quietly=TRUE))
+            bw<-colorRampPalette(c("#0058CC", "white"))
+            wr<-colorRampPalette(c("white", "#CC3300"))
+            colvec<-c(bw(50),wr(50))
 
-	  colnames(data)<-gsub("\\%GOCC\\%"," | ",gsub("GOcc","GOCC",colnames(data)))
+            colnames(data)<-gsub("\\%GOCC\\%"," | ",gsub("GOcc","GOCC",colnames(data)))
 
-	  if(!modulesInMemory) {
-	    uniquemodcolors=labels2colors(1:((ncol(GSA.FET.collapsed.outSimple.Zscore)-2)/2))  #variable reused for color annotation here; meaningless for non-WGCNA lists  #/2 because Genes.Hit double the columns.
-	    myRowAnnotation=data.frame(Lists=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
-	    heatmapLegendColors<-list(Lists=factor(sort(uniquemodcolors)))
-	  } else {
-	    heatmapLegendColors<-list(Modules=sort(uniquemodcolors))
-	    myRowAnnotation=data.frame(Modules=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
-	  }
+            if(!modulesInMemory) {
+              uniquemodcolors=labels2colors(1:((ncol(GSA.FET.collapsed.outSimple.Zscore)-2)/2))  #variable reused for color annotation here; meaningless for non-WGCNA lists  #/2 because Genes.Hit double the columns.
+              myRowAnnotation=data.frame(Lists=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
+              heatmapLegendColors<-list(Lists=factor(sort(uniquemodcolors)))
+            } else {
+              heatmapLegendColors<-list(Modules=sort(uniquemodcolors))
+              myRowAnnotation=data.frame(Modules=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
+            }
 
-	  suppressPackageStartupMessages(require(NMF,quietly=TRUE))  # for aheatmap
-	  pdf(file=paste0("GO_cc_clustering_from_GSA_FET_Z-",filenameFinal,".pdf"),width=18.5,height=18,onefile=FALSE)
-	    aheatmap(x=data, ## Numeric Matrix
-	           main="Co-clustering with manhattan distance function, ward metric",
-	  #         annCol=metdat,  ## Color swatch and legend annotation of columns/samples and rows (not used)
-	           annRow=myRowAnnotation,
-	           annColors=heatmapLegendColors,
-	           border=list(matrix = TRUE),
-	           scale="none",  ## row, column, or none
-	           distfun="manhattan",hclustfun="ward", ## Clustering options
-	           cexRow=0.8, ## Character sizes
-	           cexCol=0.8,
-	           col=colvec,   #c("white","black"), ## Color map scheme
-	           treeheight=80,
-	           Rowv=TRUE,Colv=TRUE) ## Cluster columns
-	  dev.off()
-	  
-	  } # end if (cocluster) 
-	} # end if(length(uniquemodcolors)<1)
-	
-	setwd(filePath)
+            suppressPackageStartupMessages(require(NMF,quietly=TRUE))  # for aheatmap
+            pdf(file=paste0("GO_cc_clustering_from_GSA_FET_Z-",filenameFinal,".pdf"),width=18.5,height=18,onefile=FALSE)
+              aheatmap(x=data, ## Numeric Matrix
+                     main="Co-clustering with manhattan distance function, ward metric",
+            #         annCol=metdat,  ## Color swatch and legend annotation of columns/samples and rows (not used)
+                     annRow=myRowAnnotation,
+                     annColors=heatmapLegendColors,
+                     border=list(matrix = TRUE),
+                     scale="none",  ## row, column, or none
+                     distfun="manhattan",hclustfun="ward", ## Clustering options
+                     cexRow=0.8, ## Character sizes
+                     cexCol=0.8,
+                     col=colvec,   #c("white","black"), ## Color map scheme
+                     treeheight=80,
+                     Rowv=TRUE,Colv=TRUE) ## Cluster columns
+            dev.off()
+          } # end while(!ncol(data)==0)
+          } # end if (cocluster) 
+        } # end if(length(uniquemodcolors)<1)
+        
+        setwd(filePath)
 
 
 }
