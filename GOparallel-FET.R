@@ -814,7 +814,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  matrixdata <- data <- t(as.matrix(GSA.FET.GOCC.Zscore.minimal.terms[,3:ncol(GSA.FET.GOCC.Zscore.minimal.terms)]))
           
           if(ncol(data)==0) cat("- No significant Cellular Component ontologies found. Skipping GOCC Cluster Heatmap output.\n\n")
-          while(!ncol(data)==0) {
+          if(!ncol(data)==0) {
 
 	    data[matrixdata>4]<-4
             data[matrixdata< -4] <- -4
@@ -852,7 +852,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
                      treeheight=80,
                      Rowv=TRUE,Colv=TRUE) ## Cluster columns
             dev.off()
-          } # end while(!ncol(data)==0)
+          } # end if(!ncol(data)==0)
           } # end if (cocluster) 
         } # end if(length(uniquemodcolors)<1)
         
