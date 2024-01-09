@@ -439,9 +439,9 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    }
 	    if (missing(gsc)) {
 	        stop("argument gsc needs to be given")
-	    } else {
-	        if (!is(gsc, "GSC")) 
-	            stop("argument gsc should be of class GSC, as returned by the loadGSC function")
+#	    } else {
+#	        if (!is(gsc, "GSC")) 
+#	            stop("argument gsc should be of class GSC, as returned by the loadGSC function")  # disabled since the list we create is not of GSC class
 	    }
 	    if (missing(universe)) {
 	        if (!all(pvalues == 0)) {
@@ -537,8 +537,25 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	clusterLocal <- makeCluster(c(rep("localhost",parallelThreads)),type="SOCK")
 	registerDoParallel(clusterLocal)
 	
-	## Load GMT file
-	GSCfromGMT<-loadGSC(file=GMTdatabaseFile)
+	## Load GMT file; Clean UTF-8 characters (since Dec 2023); Write clean.GMT back out
+	#GMT.df <- read.delim(GMTdatabaseFile, encoding = "utf-8",quote="", sep="\t",header=FALSE) 
+	GMT.df <- readLines(con <- file(GMTdatabaseFile, encoding = "utf-8"))
+        close(con)
+        GMT.df <- unlist(sapply(GMT.df, function(x) iconv(gsub("^(PMC\\d*__.+?)\\\t(.*)$","\\1%PMC%\\2", 
+                                                          gsub("\\\"","", gsub("â€.","-",x) )),
+                                                          "utf-8","ASCII", "")))
+	names(GMT.df)<-NULL
+        GMT.df <- lapply(GMT.df, function(x) stringr::str_split_fixed(x, pattern="\t", n=Inf))
+
+        # Create list object that is identical to a GSC class object, just not of this class, since not loaded by the loadGSC() function in piano package.
+        GSCfromGMT<-list()
+        GSCfromGMT[["addInfo"]]<-do.call(rbind, lapply(GMT.df, function(x) if(grepl("^PMC.*\\%PMC\\%",x[1])) { c(x[1],gsub("^(PMC.*)\\%PMC\\%.*$","\\1",x[1])) } else { x[c(1:2)] } ))
+        GSCfromGMT[["gsc"]]<-lapply(GMT.df, function(x) if(grepl("^PMC.*\\%PMC\\%",x[1])) { x[c(2:length(x))][!x[c(2:length(x))]==""] } else { x[c(3:length(x))][!x[c(3:length(x))]==""] })
+        names(GSCfromGMT$gsc)<-GSCfromGMT$addInfo[,1]
+        
+        # Time and memory overhead are too great to write and read back in a clean.GMT.  We process the provided .GMT with UTF-8 and inconsistencies every time this script is run.
+        #write.table(GMT.df,file="clean.GMT",sep='\t',quote=FALSE, col.names=FALSE, row.names=FALSE)
+        #GSCfromGMT<-loadGSC(file="clean.GMT")  # loadGSC(file=GMTdatabaseFile)
 	
 	## Be sure cluster nodes for parallel processing inherit needed variables from both .GlobalEnv and current function environment (error seen in R 4.2.1 in RStudio on Windows).
 	if(!exists("DEXlistsForGO")) DEXlistsForGO<-list()
@@ -586,6 +603,8 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  if(is.na(x[1])) {    #*** occurs when "no genes selected due to too strict pcutoff" in GSEA-FET piano
 	    NA
 	  } else {
+	    #PMC\\d*__F\\d* ontologyTypes for PMC gene sets added December 2023 -- collapse to ontologyType "PMC"
+	    #rownames(x)=gsub("^(PMC\\d*__.*)\\t(.*)\\t(.*)",iconv("\\2%PMC%\\1\\t\\3", "latin1","ASCII", ""),rownames(x))
 	    ontology=stringr::str_to_title(gsub("\\%WIKIPATHWAYS_\\d*","", gsub("\\%WP_\\d*","", gsub("\\&(.*);","\\1",gsub("<\\sI>","",gsub("<I>","", gsub("(.*)\\%.*\\%.*","\\1",rownames(x))))))))
 	    ontologyType=gsub("^WP\\d*","WikiPathways", gsub(".*\\%(.*)\\%.*","\\1",rownames(x)))
 
@@ -610,6 +629,8 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	
 	## Available Ontology Types
 #	 data.frame(x=table( gsub("^WP\\d*","WikiPathways",gsub(".*\\%(.*)\\%.*","\\1",rownames(GSA.FET.resTab.list[[1]])))))
+
+##Circa 2022
 	#                                                 x.Var1 x.Freq
 	#1                                                BIOCYC     99
 	#2                                                  GOBP   6432
@@ -625,10 +646,48 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	#12                      REACTOME DATABASE ID RELEASE 80    795
 	#13                                                SMPDB    371
 	#14                                         WikiPathways    529
-	
 
+##Dec2023
+#	 data.frame(x=table( gsub("^PMC\\d*__.*","PMC", gsub("^WP\\d*","WikiPathways",gsub(".*\\%(.*)\\%.*","\\1",rownames(GSA.FET.resTab.list[[1]]))))))
+#	 data.frame(x=table( GSA.FET.outSimple[[1]]$ontologyType ))
+
+	#                                                 x.Var1 x.Freq
+	#1                                                BIOCYC     94
+	#2                                                  GOBP   6518
+	#3                                                  GOCC    784
+	#4                                                  GOMF   1704
+	#5                                              HUMANCYC      3
+	#6                                                   IOB     34
+	#7                                             MSIGDB_C2    415
+	#8                                        MSIGDBHALLMARK     50
+	#9                                       PANTHER PATHWAY     89
+	#10 PATHWAY INTERACTION DATABASE NCI-NATURE CURATED DATA    201
+	#11                                             PATHWHIZ    260
+	#12                                             REACTOME    843
+	#13                      REACTOME DATABASE ID RELEASE 38    802
+	#14                                                SMPDB    290
+	#15                                         WikiPathways    632
 	
-	
+##Jan2024
+#	 data.frame(x=table( GSA.FET.outSimple[[1]]$ontologyType ))
+# note: ontologies kept from input GMT is dependent on background overlap with 'universe' of genes in the GMT  -- this is for a smaller background of ~1100 symbols
+	#                                                 x.Var1 x.Freq
+	#1                                                BIOCYC      9
+	#2                                                  GOBP   2426
+	#3                                                  GOCC    335
+	#4                                                  GOMF    573
+	#5                                                   IOB      4
+	#6                                             MSIGDB_C2     38
+	#7                                        MSIGDBHALLMARK     35
+	#8                                       PANTHER PATHWAY     13
+	#9  PATHWAY INTERACTION DATABASE NCI-NATURE CURATED DATA     53
+	#10                                             PATHWHIZ     31
+	#11                                                  PMC    880
+	#12                                             REACTOME    188
+	#13                      REACTOME DATABASE ID RELEASE 65    191
+	#14                                                SMPDB     37
+	#15                                         WikiPathways    122
+
 	
 	##3. Output Report of Z-Score Barplots, processing all GSA FET output tables
 	############################# ----------------------Plotting for modules ------------------------#######################
@@ -636,7 +695,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	
 	
 	##color scheme for ontology type key/legend (can be changed in user parameters, editing the "color" vector)
-	ontologyTypes=c("Biological Process","Molecular Function","Cellular Component","Reactome","WikiPathways","MSIG.C2")
+	ontologyTypes=c("Biological Process","Molecular Function","Cellular Component","Reactome","WikiPathways","MSIG.C2") # ,"PMC")
 	
 	if(ANOVAgroups) {
 	  xlabels <- names(DEXlistsForGO)
@@ -662,8 +721,8 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	if(!exists("panelDimensions")) panelDimensions=c(3,2)
 	if(!exists("color")) color=c("darkseagreen3","lightsteelblue1","lightpink4","goldenrod","darkorange","gold")
             #colors respectively for ontology Types:
-            #"Biological Process","Molecular Function","Cellular Component","Reactome","WikiPathways","MSig.C2"
-	if(!length(color)==6) color=c("darkseagreen3","lightsteelblue1","lightpink4","goldenrod","darkorange","gold")
+            #"Biological Process","Molecular Function","Cellular Component","Reactome","WikiPathways","MSig.C2","PMC"
+	if(!length(color)==7) color=c("darkseagreen3","lightsteelblue1","lightpink4","goldenrod","darkorange","gold")
 	if(!exists("maxBarsPerOntology")) maxBarsPerOntology=5
 	
 	
@@ -716,6 +775,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 		tmp3 = rbind(tmp3,tmp2[tmp2$ontologyType == "REACTOME",][c(1:maxBarsPerOntology),] )
 		tmp3 = rbind(tmp3,tmp2[tmp2$ontologyType == "WikiPathways",][c(1:maxBarsPerOntology),] )
 		tmp3 = rbind(tmp3,tmp2[tmp2$ontologyType == "MSIGDB_C2",][c(1:maxBarsPerOntology),] )
+#		tmp3 = rbind(tmp3,tmp2[tmp2$ontologyType == "PMC",][c(1:maxBarsPerOntology),] )   # PMCid(s) of publication-associated gene lists enriched in your input; Bader Lab added these entries to GMT files starting December 2023.
 	
 		tmp3 <- na.omit(tmp3)
 		tmp3 <- tmp3[which(tmp3$Zscore>=minZ),]
@@ -741,6 +801,8 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 				tmp3$color[j] <- color[5]
 			} else if (tmp3$ontologyType[j] == "MSIGDB_C2"){
 				tmp3$color[j] <- color[6]
+#			} else if (tmp3$ontologyType[j] == "PMC"){
+#				tmp3$color[j] <- color[7]
 			}
 	
 		# tmp3$color[j] <- uniquemodcolors[i] #module color for all bars, instead of different colors by ontology type
@@ -792,68 +854,70 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  rownames(GSA.FET.GOCC.Zscore)<-temp.rownames
 	  GSA.FET.GOCC.terms <- gsub("^.*\\%GO..\\%(GO:\\d*)$","\\1",rownames(GSA.FET.GOCC.Zscore))
 	  minZ<-qnorm(1e-5/2, lower.tail=FALSE)
-	  GSA.FET.GOCC.terms.minZreached <- apply(GSA.FET.GOCC.Zscore[,3:ncol(GSA.FET.GOCC.Zscore)],1,function(x) if (max(x)>=minZ) { TRUE } else { FALSE } )
+	  if(nrow(GSA.FET.GOCC.Zscore)>0) {
+	    GSA.FET.GOCC.terms.minZreached <- apply(GSA.FET.GOCC.Zscore[,3:ncol(GSA.FET.GOCC.Zscore)],1,function(x) if (max(x)>=minZ) { TRUE } else { FALSE } )
 
-	  if (removeRedundantGOterms) {
-	    GSA.FET.GOCC.minimal.terms <- minimal_set(ontology.index, terms=GSA.FET.GOCC.terms[which(GSA.FET.GOCC.terms.minZreached)])
-	  } else {
-	    GSA.FET.GOCC.minimal.terms <- GSA.FET.GOCC.terms[which(GSA.FET.GOCC.terms.minZreached)]
-	    cat("- Note: removeRedundantGOterms=FALSE.  You can reduce cellular component terms in the coclustering by setting this variable to TRUE.\n\n")
-	  }
+	    if (removeRedundantGOterms) {
+	      GSA.FET.GOCC.minimal.terms <- minimal_set(ontology.index, terms=GSA.FET.GOCC.terms[which(GSA.FET.GOCC.terms.minZreached)])
+	    } else {
+	      GSA.FET.GOCC.minimal.terms <- GSA.FET.GOCC.terms[which(GSA.FET.GOCC.terms.minZreached)]
+	      cat("- Note: removeRedundantGOterms=FALSE.  You can reduce cellular component terms in the coclustering by setting this variable to TRUE.\n\n")
+	    }
 
-	  GSA.FET.GOCC.Zscore.minimal.terms <- GSA.FET.GOCC.Zscore[which(GSA.FET.GOCC.terms %in% GSA.FET.GOCC.minimal.terms),]
-	  dim(GSA.FET.GOCC.Zscore)
-	  # 980 rows of GO:CC terms
-	  length(which(GSA.FET.GOCC.terms.minZreached))
-	  # 596 have at least 1 Z score above minZ set immediately above (with p val max 0.001 used to calc minZ immediately above...)
-	  # 381 at p val max 0.00001
-	  length(GSA.FET.GOCC.minimal.terms)
-	  # 329 kept out of 980 (with p val max 0.001 used to calc minZ immediately above...)
-	  # 191 kept out of 980 (with p val max 0.00001 used to calc minZ immediately above...)
-	  
-	  matrixdata <- data <- t(as.matrix(GSA.FET.GOCC.Zscore.minimal.terms[,3:ncol(GSA.FET.GOCC.Zscore.minimal.terms)]))
-          
-          if(ncol(data)==0) cat("- No significant Cellular Component ontologies found. Skipping GOCC Cluster Heatmap output.\n\n")
-          if(!ncol(data)==0) {
-
-	    data[matrixdata>4]<-4
-            data[matrixdata< -4] <- -4
+	    GSA.FET.GOCC.Zscore.minimal.terms <- GSA.FET.GOCC.Zscore[which(GSA.FET.GOCC.terms %in% GSA.FET.GOCC.minimal.terms),]
+	    dim(GSA.FET.GOCC.Zscore)
+	    # 980 rows of GO:CC terms
+	    length(which(GSA.FET.GOCC.terms.minZreached))
+	    # 596 have at least 1 Z score above minZ set immediately above (with p val max 0.001 used to calc minZ immediately above...)
+	    # 381 at p val max 0.00001
+	    length(GSA.FET.GOCC.minimal.terms)
+	    # 329 kept out of 980 (with p val max 0.001 used to calc minZ immediately above...)
+	    # 191 kept out of 980 (with p val max 0.00001 used to calc minZ immediately above...)
+	    
+	    matrixdata <- data <- t(as.matrix(GSA.FET.GOCC.Zscore.minimal.terms[,3:ncol(GSA.FET.GOCC.Zscore.minimal.terms)]))
             
-            #NMF - initial approach
-            suppressPackageStartupMessages(require(WGCNA,quietly=TRUE))
-            bw<-colorRampPalette(c("#0058CC", "white"))
-            wr<-colorRampPalette(c("white", "#CC3300"))
-            colvec<-c(bw(50),wr(50))
+            if(ncol(data)==0) cat("- No significant Cellular Component ontologies found. Skipping GOCC Cluster Heatmap output.\n\n")
+            if(!ncol(data)==0) {
 
-            colnames(data)<-gsub("\\%GOCC\\%"," | ",gsub("GOcc","GOCC",colnames(data)))
+	      data[matrixdata>4]<-4
+              data[matrixdata< -4] <- -4
+              
+              #NMF - initial approach
+              suppressPackageStartupMessages(require(WGCNA,quietly=TRUE))
+              bw<-colorRampPalette(c("#0058CC", "white"))
+              wr<-colorRampPalette(c("white", "#CC3300"))
+              colvec<-c(bw(50),wr(50))
 
-            if(!modulesInMemory) {
-              uniquemodcolors=labels2colors(1:((ncol(GSA.FET.collapsed.outSimple.Zscore)-2)/2))  #variable reused for color annotation here; meaningless for non-WGCNA lists  #/2 because Genes.Hit double the columns.
-              myRowAnnotation=data.frame(Lists=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
-              heatmapLegendColors<-list(Lists=factor(sort(uniquemodcolors)))
-            } else {
-              heatmapLegendColors<-list(Modules=sort(uniquemodcolors))
-              myRowAnnotation=data.frame(Modules=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
-            }
+              colnames(data)<-gsub("\\%GOCC\\%"," | ",gsub("GOcc","GOCC",colnames(data)))
 
-            suppressPackageStartupMessages(require(NMF,quietly=TRUE))  # for aheatmap
-            pdf(file=paste0("GO_cc_clustering_from_GSA_FET_Z-",filenameFinal,".pdf"),width=18.5,height=18,onefile=FALSE)
-              aheatmap(x=data, ## Numeric Matrix
-                     main="Co-clustering with manhattan distance function, ward metric",
-            #         annCol=metdat,  ## Color swatch and legend annotation of columns/samples and rows (not used)
-                     annRow=myRowAnnotation,
-                     annColors=heatmapLegendColors,
-                     border=list(matrix = TRUE),
-                     scale="none",  ## row, column, or none
-                     distfun="manhattan",hclustfun="ward", ## Clustering options
-                     cexRow=0.8, ## Character sizes
-                     cexCol=0.8,
-                     col=colvec,   #c("white","black"), ## Color map scheme
-                     treeheight=80,
-                     Rowv=TRUE,Colv=TRUE) ## Cluster columns
-            dev.off()
-          } # end if(!ncol(data)==0)
-          } # end if (cocluster) 
+              if(!modulesInMemory) {
+                uniquemodcolors=labels2colors(1:((ncol(GSA.FET.collapsed.outSimple.Zscore)-2)/2))  #variable reused for color annotation here; meaningless for non-WGCNA lists  #/2 because Genes.Hit double the columns.
+                myRowAnnotation=data.frame(Lists=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
+                heatmapLegendColors<-list(Lists=factor(sort(uniquemodcolors)))
+              } else {
+                heatmapLegendColors<-list(Modules=sort(uniquemodcolors))
+                myRowAnnotation=data.frame(Modules=as.numeric(factor(uniquemodcolors,levels=sort(uniquemodcolors))))
+              }
+
+              suppressPackageStartupMessages(require(NMF,quietly=TRUE))  # for aheatmap
+              pdf(file=paste0("GO_cc_clustering_from_GSA_FET_Z-",filenameFinal,".pdf"),width=18.5,height=18,onefile=FALSE)
+                aheatmap(x=data, ## Numeric Matrix
+                       main="Co-clustering with manhattan distance function, ward metric",
+              #         annCol=metdat,  ## Color swatch and legend annotation of columns/samples and rows (not used)
+                       annRow=myRowAnnotation,
+                       annColors=heatmapLegendColors,
+                       border=list(matrix = TRUE),
+                       scale="none",  ## row, column, or none
+                       distfun="manhattan",hclustfun="ward", ## Clustering options
+                       cexRow=0.8, ## Character sizes
+                       cexCol=0.8,
+                       col=colvec,   #c("white","black"), ## Color map scheme
+                       treeheight=80,
+                       Rowv=TRUE,Colv=TRUE) ## Cluster columns
+              dev.off()
+            } # end if(!ncol(data)==0)
+            } # end if (cocluster) 
+          } else { cat("- No significant Cellular Component ontologies (rows) found. Skipping GOCC Cluster Heatmap output.\n\n") }  # end if(nrow(GSA.FET.GOCC.Zscore)>0)
         } # end if(length(uniquemodcolors)<1)
         
         setwd(filePath)
