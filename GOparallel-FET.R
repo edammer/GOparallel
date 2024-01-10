@@ -542,7 +542,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	GMT.df <- readLines(con <- file(GMTdatabaseFile, encoding = "utf-8"))
         close(con)
         GMT.df <- unlist(sapply(GMT.df, function(x) iconv(gsub("^(PMC\\d*__.+?)\\\t(.*)$","\\1%PMC%\\2", 
-                                                          gsub("\\\"","", gsub("â€.","-",x) )),
+                                                          gsub("\\\"","", gsub("\\x83\\x80.","-",x) )),
                                                           "utf-8","ASCII", "")))
 	names(GMT.df)<-NULL
         GMT.df <- lapply(GMT.df, function(x) stringr::str_split_fixed(x, pattern="\t", n=Inf))
