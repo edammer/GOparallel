@@ -728,7 +728,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	if(!exists("color")) color=c("darkseagreen3","lightsteelblue1","lightpink4","goldenrod","darkorange","gold")
             #colors respectively for ontology Types:
             #"Biological Process","Molecular Function","Cellular Component","Reactome","WikiPathways","MSig.C2","PMC"
-	if(!length(color)==7) color=c("darkseagreen3","lightsteelblue1","lightpink4","goldenrod","darkorange","gold")
+	if(!length(color)==6) color=c("darkseagreen3","lightsteelblue1","lightpink4","goldenrod","darkorange","gold")
 	if(!exists("maxBarsPerOntology")) maxBarsPerOntology=5
 	
 	
