@@ -922,8 +922,8 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
                        Rowv=TRUE,Colv=TRUE) ## Cluster columns
               dev.off()
             } # end if(!ncol(data)==0)
-            } # end if (cocluster) 
-          } else { cat("- No significant Cellular Component ontologies (rows) found. Skipping GOCC Cluster Heatmap output.\n\n") }  # end if(nrow(GSA.FET.GOCC.Zscore)>0)
+            } else { cat("- No significant Cellular Component ontologies (rows) found. Skipping GOCC Cluster Heatmap output.\n\n") }  # end if(nrow(GSA.FET.GOCC.Zscore)>0)
+          } # end if (cocluster) 
         } # end if(length(uniquemodcolors)<1)
         
         setwd(filePath)
