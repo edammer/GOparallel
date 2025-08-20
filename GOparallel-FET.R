@@ -2,6 +2,8 @@
 ## One-Step GSA FET (R piano implementation) WITH USER PARAMETERS
 ##  - by Eric Dammer, Divya Nandakumar
 ## Nicholas Seyfried Lab Bioinformatics - for the lab -
+##   08/20/2025 version 1.3         -- malloc warning/error for parallelization on some Macs fixed; added Cohen's kappa graph-based
+##                                     pruning within ontology types with option removeRedundantGOterms="kappa"
 ##   03/07/2023 version 1.2         -- Outputs include semicolon-separated Genes.Hit goi[goi %in% gs] for each input list/gene set
 ##   10/18/2022 version 1.1         -- (inputFile variable previously fileName and other syntax changes; now runs on R v4.2.0)
 ##                                  -- cocluster now runs even if removeRedundantGOterms not set or FALSE.
@@ -44,7 +46,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	## Takes in the module assignment file as input with 1st column having gene names, 2nd column having color assignments followed by kME values
 	
 
-	if (!exists("filePath")) { cat(paste0(" - filePath variable not specified. Input/Output will take place in the current working directory: ",getwd(),"/ ...\n")); filePath==paste0(getwd(),"/"); }
+	if (!exists("filePath")) { cat(paste0(" - filePath variable not specified. Input/Output will take place in the current working directory: ",getwd(),"/ ...\n")); filePath<-paste0(getwd(),"/"); }
 	if (!exists("outFilename")) { cat(paste0("- outFilename variable not specified. Output files will be saved to: ",getwd(),"/GOparallel/ ...\n")); outFilename="GOparallel"; }
 	if (!dir.exists(file.path(filePath, outFilename))) dir.create(file.path(filePath, outFilename))
 	
@@ -93,8 +95,10 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 		} else { stop(paste0("This is not an interactive session and required GMT file not found.\n",GMTdatabaseFile," must be downloaded interactively or prior to running this function.")) }
 	}
 
-	if(!exists("removeRedundantGOterms")) { cat("- removeRedundantGOterms not specified TRUE/FALSE. Removing them as the default, using go.obo and ontologyIndex package.\n"); removeRedundantGOterms=TRUE; }
-	if(removeRedundantGOterms) {
+	if(!exists("removeRedundantGOterms")) { cat("- removeRedundantGOterms not specified TRUE/FALSE, or 'kappa'. Removing them as the default, using go.obo and ontologyIndex package (you can also try removeRedundantGOterms='kappa').\n"); removeRedundantGOterms=TRUE; } else {
+        if (removeRedundantGOterms=="Kappa" | removeRedundantGOterms=="KAPPA") removeRedundantGOterms="kappa"
+        if (removeRedundantGOterms=="kappa") { cat("- removeRedundantGOterms='kappa'; will use Cohen's kappa<0.30 in igraph representation of gene symbol similarity to prune within ontology types.\n") } else {
+	   if(removeRedundantGOterms) {
 		if (!file.exists(GO.OBOfile)) {
 			suppressPackageStartupMessages(require(curl,quietly=TRUE))
 			OBOtargetPath=gsub("(.*\\/).*$","\\1",GO.OBOfile)
@@ -107,9 +111,11 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 			cat("GO.OBOfile set to downloaded file: ", paste0(OBOtargetPath,"go.obo"),"\n")
 			GO.OBOfile=paste0(OBOtargetPath,"go.obo")
 		}
+	     }
+	   }
 	}
 	
-	## Check what type of input the user wants. modulesInMemory/ANOVAgroups/
+	## Check what type of input the user wants. modulesInMemory/ANOVAgroups/file(lists as columns, or kME module membership table)
 	if (!exists("ANOVAgroups") & !exists("modulesInMemory")) {
 	  if(!exists("inputFile")) {
 	    cat("- No input specified as modulesInMemory=TRUE, ANOVAgroups=TRUE, and no inputFile variable for input either.\n  Trying modulesInMemory=TRUE ...\n")
@@ -126,14 +132,14 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	      if(ANOVAgroups) {
 	        if(exists("ANOVAout")) { cat("- Found ANOVAgroups=TRUE. Proceeding to process ANOVAout table from memory, using any selections and thresholds set during volcano plotting...\n"); modulesInMemory=FALSE; } else { if (!length(dummyVar)==1) { cat("- ANOVAout not in memory, trying to use input provided to this function (could be ANOVAout or CORout).\n"); ANOVAout=as.data.frame(dummyVar); modulesInMemory=FALSE; } else { stop("Variable ANOVAout not found or no input was provided.\nPlease run parANOVA.dex() function first, and save output to ANOVAout variable or pass its output to this function.\n\n") } }
 	      } else {
-	        if(exists("modulesInMemory")) if(is.logical("modulesInMemory")) if(!modulesInMemory) {  # both flags are FALSE
+	        if(exists("modulesInMemory")) if(is.logical(modulesInMemory)) if(!modulesInMemory) {  # both flags are FALSE
 	          if(!exists("outFilename")) { stop("modulesInMemory=FALSE, ANOVAgroups=FALSE, and no outFilename variable for input either.\nOne of these must be used.\n") }
 	        } else {
 	          cat("- modulesInMemory=TRUE. We will use network module colors vector and symbols found in rownames of cleanDat table for gene lists to check for ontology enrichment.\n")
 	        }
 	      }
 	    } else {  #ANOVAgroups not logical TRUE/FALSE
-	      if(exists("modulesInMemory")) if(is.logical("modulesInMemory")) if(!modulesInMemory) {  # modulesInMemory is FALSE
+	      if(exists("modulesInMemory")) if(is.logical(modulesInMemory)) if(!modulesInMemory) {  # modulesInMemory is FALSE
 	        if(!exists("inputFile")) { cat("- modulesInMemory=FALSE, ANOVAgroups not TRUE/FALSE, and no inputFile variable for input either.\nOne of these must be used.  Trying ANOVAgroups=TRUE ...\n"); ANOVAgroups=TRUE; 
 	                                 if(exists("ANOVAout")) { cat("- Found ANOVAout. Proceeding to process ANOVAout table from memory, using any selections and thresholds set during volcano plotting...\n") } else { stop("\nANOVAout table not found in memory.\n\n") }
 	        } else {  # inputFile variable set. Does the file exist?
@@ -540,7 +546,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	
 	## Set up parallel backend.
 	suppressPackageStartupMessages(require("doParallel",quietly=TRUE))
-	clusterLocal <- makeCluster(c(rep("localhost",parallelThreads)),type="SOCK")
+	clusterLocal <- makeCluster(c(rep("localhost",parallelThreads)) )  #,type="SOCK") <- may cause malloc error on macOS/non-windows."PSOCK" or leave off...
 	registerDoParallel(clusterLocal)
 	
 	## Load GMT file; Clean UTF-8 characters (since Dec 2023); Write clean.GMT back out
@@ -593,9 +599,10 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  #list [[this.color]][["padj.greater"]] is FDR vector
 	  #list [[this.color]][["resTab"]] is same-ordered (rows) matrix of: p-value, FDR, ... with rownames equal to the ontology name%ontology type%OntologyID
 	  #list [[this.color]][["pvalues.less"]] is depletion p value vector (relevant for signed Z score calculation), only in customized function
-	
+
 	  return(list(thislist[["resTab"]], thislist[["gsc"]]))
 	}
+        stopCluster(clusterLocal)
 	
 	  # re-combine list elements from two outputs, over all uniquemodcolors
 	  GSA.FET.resTab.list           = do.call(list,lapply(GSA.FET.outlist,function(x){x[[1]]}))
@@ -713,14 +720,171 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  xlabels.frame <- as.data.frame(data.frame(Colors=xlabels,Labels=paste0(xlabels1," ",xlabels)))
 	}
 	
-	if (removeRedundantGOterms) {
+	if (!removeRedundantGOterms=="kappa") {
+	  if(removeRedundantGOterms) {
 		suppressPackageStartupMessages(require(ontologyIndex))
 		ontology.index<-get_OBO(file=GO.OBOfile,extract_tags="everything")
 		#below function minimal_set uses ancestors list to dereplicate; what about using synonyms list from our go.obo as ancestors?
-	}
+	  }
+	} else {  # removeRedundantGOterms=="kappa"
+
+          # --- Cohen's kappa clustering on gene-set membership -------------------------
+          kappa_cluster_ontologies <- function(gene_sets_present, kappa_cut = 0.30,
+                                               method = c("hier", "graph")) {
+            method <- match.arg(method, c("hier","graph"))
+          
+            # Normalize & validate
+            terms <- names(gene_sets_present)
+            if (is.null(terms)) stop("gene_sets_present must be a *named* list.")
+            gene_sets_present <- lapply(gene_sets_present, function(x) unique(as.character(x)))
+            n <- length(gene_sets_present)
+          
+            if (n == 0L) return(data.frame(term = character(0), cluster = integer(0)))
+            if (n == 1L) return(data.frame(term = terms, cluster = 1L))
+          
+            # Universe & encodings
+            U <- sort(unique(unlist(gene_sets_present)))
+            N <- length(U)
+            idx_map  <- setNames(seq_along(U), U)
+            sets_idx <- lapply(gene_sets_present, function(gs) if (length(gs)) sort(idx_map[gs]) else integer(0))
+            sizes    <- vapply(sets_idx, length, integer(1))
+          
+            # If nothing in universe, just give unique clusters
+            if (N == 0L || all(sizes == 0L)) {
+              return(data.frame(term = terms, cluster = seq_len(n)))
+            }
+          
+            # Pairwise intersections (upper triangle)
+            intersec_mat <- matrix(0L, n, n)
+            for (i in seq_len(n - 1L)) {
+              gi <- sets_idx[[i]]
+              for (j in (i + 1L):n) {
+                intersec_mat[i, j] <- length(intersect(gi, sets_idx[[j]]))
+              }
+            }
+            intersec_mat <- intersec_mat + t(intersec_mat)
+            diag(intersec_mat) <- sizes
+          
+            # Cohen’s kappa
+            A  <- intersec_mat
+            Bi <- matrix(sizes, n, n, byrow = FALSE) - A
+            Cj <- matrix(sizes, n, n, byrow = TRUE)  - A
+            D  <- N - (A + Bi + Cj)
+          
+            p0 <- (A + D) / max(N, 1L)
+            pe <- (outer(sizes, sizes, "*") + outer(N - sizes, N - sizes, "*")) / max(N^2, 1L)
+          
+            denom <- pmax(1 - pe, .Machine$double.eps)
+            K <- (p0 - pe) / denom
+            diag(K) <- 1
+            K[!is.finite(K)] <- 0
+          
+            if (method == "hier") {
+              Dmat <- as.dist(pmax(0, 1 - K))
+              hc <- hclust(Dmat, method = "average")
+              cl <- cutree(hc, h = 1 - kappa_cut)
+              data.frame(term = terms, cluster = as.integer(cl))
+            } else {
+              if (!requireNamespace("igraph", quietly = TRUE)) {
+                stop("Please install 'igraph' for graph-based clustering, pruning via 'kappa'.")
+              }
+              adj <- (K >= kappa_cut)
+              diag(adj) <- FALSE
+              g <- igraph::graph_from_adjacency_matrix(adj, mode = "undirected", diag = FALSE)
+              comp <- igraph::components(g)$membership
+              data.frame(term = terms, cluster = as.integer(comp))
+            }
+          }
+          
+          # --- Prune a per-list table (tmp2) to 1 representative per cluster -----------
+          # tmp2 must have columns: ontology, ontologyType, Zscore, Pvalue.Enrichment, Genes.Hit
+          prune_ontologies_by_kappa <- function(tmp2, kappa_cut = 0.30, method = c("hier", "graph")) {
+            method <- match.arg(method, c("hier","graph"))
+            need <- c("ontology","ontologyType","Zscore","Pvalue.Enrichment","Genes.Hit")
+            stopifnot(all(need %in% names(tmp2)))
+          
+            df <- tmp2
+            df$ontology          <- as.character(df$ontology)
+            df$ontologyType      <- as.character(df$ontologyType)
+            df$Zscore            <- suppressWarnings(as.numeric(df$Zscore))
+            df$Pvalue.Enrichment <- suppressWarnings(as.numeric(df$Pvalue.Enrichment))
+          
+            # Split “Genes.Hit” into symbol vectors
+            split_genes <- function(x) {
+              if (is.na(x) || !nzchar(x)) return(character(0))
+              parts <- trimws(unlist(strsplit(x, ";", fixed = TRUE)))
+              parts[nzchar(parts)]
+            }
+            genes_list <- lapply(df$Genes.Hit, split_genes)
+            df$.n_genes <- vapply(genes_list, length, integer(1))
+          
+            # Cluster **within each ontologyType**; keep 1 best per cluster
+            keep_blocks <- lapply(split(seq_len(nrow(df)), df$ontologyType), function(ii) {
+              sub <- df[ii, , drop = FALSE]
+              gs  <- lapply(sub$Genes.Hit, split_genes); names(gs) <- sub$ontology
+          
+              cl_df <- kappa_cluster_ontologies(gs, kappa_cut = kappa_cut, method = method)
+              stopifnot(nrow(cl_df) == nrow(sub))
+              sub$cluster <- cl_df$cluster
+          
+              reps <- do.call(rbind, lapply(split(seq_len(nrow(sub)), sub$cluster), function(jj) {
+                block <- sub[jj, , drop = FALSE]
+                # choose: most significant (lowest p), then fewest genes, then highest Z, then alpha
+                o <- order(block$Pvalue.Enrichment, block$.n_genes, -block$Zscore, block$ontology, na.last = TRUE)
+                block[o[1L], , drop = FALSE]
+              }))
+              reps
+            })
+          
+            kept <- do.call(rbind, keep_blocks)
+            kept <- kept[, c("ontology","ontologyType","Zscore","Pvalue.Enrichment","Genes.Hit")]
+            rownames(kept) <- NULL
+            kept
+          }
+
+          # Precompute kappa-pruned ontology tables for each list in parallel
+          GSA.KAPPA <- NULL
+          if (identical(removeRedundantGOterms, "kappa")) {
+            clusterLocal <- makeCluster(c(rep("localhost",parallelThreads)) )
+            registerDoParallel(clusterLocal)
+
+            # Make sure workers see these
+#            parallel::clusterExport(
+#              cl = clusterLocal,
+#              varlist = c("GSA.FET.outSimple", "minHitsPerOntology",
+#                          "kappa_cluster_ontologies", "prune_ontologies_by_kappa"),
+#              envir = environment()
+#            )
+
+            cat("\nPerforming Cohen's kappa-based graph clustering (k<0.30) for all output ontology lists in parallel using up to ", parallelThreads," threads...\n")
+            # igraph is needed (kappa pruning method="graph")
+            GSA.KAPPA <- foreach(thismod = uniquemodcolors,
+                                 .packages = c("igraph"),
+                                 .export = c("kappa_cluster_ontologies", "prune_ontologies_by_kappa"),
+                                 .errorhandling = "remove") %dopar% {
+              tmp <- GSA.FET.outSimple[[thismod]]
+              # Skip empty modules (occur if no genes passed the cutoff)
+              if (is.null(tmp) || (is.na(tmp[[1]][1]))) return(NULL)
+          
+              # Keep rows with enough hits
+              idx <- which(tmp[, "Significant (in gene set)"] >= minHitsPerOntology)
+              if (!length(idx)) return(NULL)
+          
+              # Reconstruct tmp2 (the trimmed 5-column data.frame you used before)
+              tmp2 <- tmp[idx, c("ontology","ontologyType","Zscore","Pvalue.Enrichment","Genes.Hit")]
+              tmp2 <- tmp2[order(tmp2$Zscore, decreasing = TRUE), ]
+              tmp2 <- tmp2[order(tmp2$ontologyType, decreasing = TRUE), ]
+          
+              # Prune via kappa
+              prune_ontologies_by_kappa(tmp2, kappa_cut = 0.30, method = "graph")
+            }
+            names(GSA.KAPPA) <- uniquemodcolors
+          }
+
+        }  # end: removeRedundantGOterms=="kappa"
 	
 	setwd(paste0(filePath,outFilename,"/"))
-	redundancyRemovalTag=if(removeRedundantGOterms) { "-redundancyRemoved" } else { "" }
+	redundancyRemovalTag=if(is.logical(removeRedundantGOterms)) { if(removeRedundantGOterms) { "-redundancyRemoved.OBOparent" } else { "" } } else if (removeRedundantGOterms=="kappa") { "-redundancyRemoved.Kbest" } else { "" }
 	filenameFinal=paste0(outFilename,redundancyRemovalTag)
 
 	if(!exists("pageDimensions")) pageDimensions=c(8.5,11)
@@ -753,28 +917,30 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 		}
 		filter.minHits.idx<-which(tmp[,"Significant (in gene set)"]>=minHitsPerOntology)
 		if (length(tmp[,2]) == 0 | length(filter.minHits.idx) == 0)  { frame(); next; }
-		tmp = tmp[filter.minHits.idx,c(11,10,9,1)] ## Select GO-terms,GO-Type, Z-score,pValues (and previously, gene Lists)
+		#tmp = tmp[filter.minHits.idx,c(11,10,9,1, 8)] ## Select GO-terms,GO-Type,Z-score,pValues (and previously/again, semicolon-separated gene Lists(8))
+                tmp2 <- tmp[filter.minHits.idx, c("ontology","ontologyType","Zscore","Pvalue.Enrichment","Genes.Hit")]
+		tmp2 = tmp2[order(tmp$Zscore,decreasing=T),]
+		tmp2 = tmp2[order(tmp2$ontologyType,decreasing=T),]
+	
+		if(identical(removeRedundantGOterms, "kappa")) { 
+                  tmp2 <- GSA.KAPPA[[thismod]]
+                  if (is.null(tmp2) || !nrow(tmp2)) { frame(); next; }
+		} else if (isTRUE(removeRedundantGOterms)) {
+		  #dim(tmp2[which((tmp2$ontologyType == "GOCC" | tmp2$ontologyType == "GOBP" | tmp2$ontologyType == "GOMF") & tmp2$Zscore>=minZ),])
+		  ##[1] 124   4
+		  go.full.tmp2<-tmp2[which((tmp2$ontologyType == "GOCC" | tmp2$ontologyType == "GOBP" | tmp2$ontologyType == "GOMF") & tmp2$Zscore>=minZ),]
+		  go.full.tmp2$Term=gsub("^.*\\%GO..\\%(GO:\\d*)$","\\1",rownames(go.full.tmp2))
 
-		tmp1 = tmp[order(tmp$Zscore,decreasing=T),]
-		tmp2 = tmp1[order(tmp1$ontologyType,decreasing=T),] #was tmp2
+		  go.minimal.terms<-minimal_set(ontology.index, terms=go.full.tmp2$Term)
+		  #go.pruned.terms<-prune_descendants(ontology.index, roots=?, terms=)
+		  go.minimal.tmp2<-go.full.tmp2[which(go.full.tmp2$Term %in% go.minimal.terms),]
 	
-		if(removeRedundantGOterms) {
-			#dim(tmp2[which((tmp2$ontologyType == "GOCC" | tmp2$ontologyType == "GOBP" | tmp2$ontologyType == "GOMF") & tmp2$Zscore>=minZ),])
-			##[1] 124   4
-			go.full.tmp2<-tmp2[which((tmp2$ontologyType == "GOCC" | tmp2$ontologyType == "GOBP" | tmp2$ontologyType == "GOMF") & tmp2$Zscore>=minZ),]
-			go.full.tmp2$Term=gsub("^.*\\%GO..\\%(GO:\\d*)$","\\1",rownames(go.full.tmp2))
-	
-			go.minimal.terms<-minimal_set(ontology.index, terms=go.full.tmp2$Term)
-			#go.pruned.terms<-prune_descendants(ontology.index, roots=?, terms=)
-			go.minimal.tmp2<-go.full.tmp2[which(go.full.tmp2$Term %in% go.minimal.terms),]
-	
-			tmp2$Zscore[which(tmp2$ontologyType=="GOCC" | tmp2$ontologyType=="GOBP" | tmp2$ontologyType=="GOMF")] <- 0  #keeps in all GO ontologies, but Z scores zeroed
-			tmp2$Zscore[match(rownames(go.minimal.tmp2),rownames(tmp2))] <-go.minimal.tmp2$Zscore                       #put back Z scores of non-redundant ontologies, to be possibly kept below
-	#		tmp2<-rbind(tmp2,go.minimal.tmp2[,-ncol(go.minimal.tmp2)])
-			tmp2 = tmp2[order(tmp2$Zscore,decreasing=T),]
-			tmp2 = tmp2[order(tmp2$ontologyType,decreasing=T),]
+		  tmp2$Zscore[which(tmp2$ontologyType=="GOCC" | tmp2$ontologyType=="GOBP" | tmp2$ontologyType=="GOMF")] <- 0  #keeps in all GO ontologies, but Z scores zeroed
+		  tmp2$Zscore[match(rownames(go.minimal.tmp2),rownames(tmp2))] <-go.minimal.tmp2$Zscore                       #put back Z scores of non-redundant ontologies, to be possibly kept below
+	#	  tmp2<-rbind(tmp2,go.minimal.tmp2[,-ncol(go.minimal.tmp2)])
+		  tmp2 = tmp2[order(tmp2$Zscore,decreasing=T),]
+		  tmp2 = tmp2[order(tmp2$ontologyType,decreasing=T),]
 		}
-	
 		tmp3 = tmp2[tmp2$ontologyType == "GOBP",][c(1:maxBarsPerOntology),]
 		tmp3 = rbind(tmp3,tmp2[tmp2$ontologyType == "GOMF",][c(1:maxBarsPerOntology),] )
 		tmp3 = rbind(tmp3,tmp2[tmp2$ontologyType == "GOCC",][c(1:maxBarsPerOntology),] )
@@ -824,9 +990,9 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	
 	par(op) # Leaves the last plot
 	dev.off()
-	
-	
-	
+
+
+
 	## Master Tables Generation for output to csv and for GO:CC Z score coclustering
 
 	for (this.input in names(GSA.FET.outSimple)) {
@@ -863,11 +1029,50 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  if(nrow(GSA.FET.GOCC.Zscore)>1) {
 	    GSA.FET.GOCC.terms.minZreached <- apply(GSA.FET.GOCC.Zscore[,3:ncol(GSA.FET.GOCC.Zscore)],1,function(x) if (max(x)>=minZ) { TRUE } else { FALSE } )
 
-	    if (removeRedundantGOterms) {
+	    if (removeRedundantGOterms=="kappa") {
+              
+              ## --- Build gene sets for significant GO:CC terms
+              sig_idx   <- which(GSA.FET.GOCC.terms.minZreached)
+              sig_terms <- GSA.FET.GOCC.terms[sig_idx]
+              
+              # Assemble a named list of gene symbols per GO term (using GSCfromGMT$gsc names like "...%GO:####")
+              gene_sets_present <- setNames(vector("list", length(sig_terms)), sig_terms)
+              for (i in seq_along(sig_terms)) {
+                go_id <- sig_terms[i]
+                hit   <- grep(paste0("%", go_id, "$"), names(GSCfromGMT$gsc))
+                gene_sets_present[[i]] <- if (length(hit)) unique(GSCfromGMT$gsc[[hit[1] ]]) else character(0)
+              }
+              
+              ## --- Kappa clustering of the significant terms
+              # Expecting a data.frame with columns: term, cluster
+              kc <- kappa_cluster_ontologies(gene_sets_present, kappa_cut = 0.30, method = "graph")
+              
+              ## --- Pick one representative per cluster: max positive Z anywhere in the row
+              # Compute per-term max positive Z across all Z-score columns (3:ncol)
+              row_maxZ <- apply(GSA.FET.GOCC.Zscore[, 3:ncol(GSA.FET.GOCC.Zscore), drop = FALSE],
+                                1, function(z) suppressWarnings(max(as.numeric(z), na.rm = TRUE)))
+              names(row_maxZ) <- GSA.FET.GOCC.terms
+              
+              # Restrict to clustered significant terms
+              ok <- kc$term %in% names(row_maxZ)
+              kc  <- kc[ok, , drop = FALSE]
+              
+              # For each cluster, keep the term with the largest maxZ
+              split_terms <- split(kc$term, kc$cluster)
+              keep_terms  <- unlist(lapply(split_terms, function(tt) tt[which.max(row_maxZ[tt])]), use.names = FALSE)
+              
+              # Update the logical filter to keep only the chosen representatives
+              GSA.FET.GOCC.terms.minZreached[] <- FALSE
+              GSA.FET.GOCC.terms.minZreached[ match(keep_terms, GSA.FET.GOCC.terms) ] <- TRUE
+              
+              # For downstream convenience, also set the minimal terms vector
+              GSA.FET.GOCC.minimal.terms <- keep_terms
+              
+	    } else if (removeRedundantGOterms) {
 	      GSA.FET.GOCC.minimal.terms <- minimal_set(ontology.index, terms=GSA.FET.GOCC.terms[which(GSA.FET.GOCC.terms.minZreached)])
 	    } else {
 	      GSA.FET.GOCC.minimal.terms <- GSA.FET.GOCC.terms[which(GSA.FET.GOCC.terms.minZreached)]
-	      cat("- Note: removeRedundantGOterms=FALSE.  You can reduce cellular component terms in the coclustering by setting this variable to TRUE.\n\n")
+	      cat("- Note: removeRedundantGOterms=FALSE.  You can reduce cellular component terms in the coclustering by setting this variable to TRUE, or 'kappa'.\n\n")
 	    }
 
 	    GSA.FET.GOCC.Zscore.minimal.terms <- GSA.FET.GOCC.Zscore[which(GSA.FET.GOCC.terms %in% GSA.FET.GOCC.minimal.terms),]
@@ -928,6 +1133,5 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
         } # end if(length(uniquemodcolors)<1)
         
         setwd(filePath)
-
 
 }
