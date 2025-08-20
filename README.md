@@ -48,7 +48,7 @@ Note the current analysis output samples in the above linked .zip use June 2022 
 ###################################################################################################################################
 ## One-Step GSA FET (R piano implementation) WITH USER PARAMETERS
 ##  - by Eric Dammer, Divya Nandakumar
-## Nicholas Seyfried Lab Bioinformatics - for the lab - 07/27/2022 version 1.01
+## Nicholas Seyfried Lab Bioinformatics - for the lab - 07/27/2022 version 1.03
 ###################################################################################################################################
 ## Preload WGCNA standard pipeline R ression's data to memory, if desired (example minimal RData given here)
 ## otherwise below code runs as a step late in the Seyfried systems biology pipeline,
@@ -116,8 +116,12 @@ ANOVAgroups=FALSE
 
 parallelThreads=30
 
-removeRedundantGOterms=TRUE
-            #if true, the 3 GO ontology types are collapased into a minimal set of less redundant terms using the below OBO file
+removeRedundantGOterms="kappa"
+            # if TRUE, ontologyIndex parent terms are kept as a minimal term set (less redundancy for 3 main ontology types);
+            # if "kappa", graph-based clustering redundancy removal is performed in parallel, reducing similar ontologies
+            #   within each of the 6 types to keep the one best enrichment scorer for the cluster of terms with kappa <0.30.
+            # if FALSE, no redundancy removal is performed.
+
 GO.OBOfile<-"C:/BaderLabGO/go.obo"
             #only used and needed if above flag to remove redundant GO terms is TRUE.
 	    #Download from http://current.geneontology.org/ontology/go.obo will commence into the specified folder if the specified filename does not exist.
@@ -134,7 +138,7 @@ GOparallel()  # parameters are set in global environment as above; if not set, t
 	      
 ```
 ## Other Notes
-Requires R packages: piano, WGCNA, curl, doParallel, rvest, ontologyIndex, NMF, stringr.
+Requires R packages: piano, WGCNA, curl, doParallel, rvest, ontologyIndex, igraph, NMF, stringr.
 The piano package (documentation <a href="https://rdrr.io/bioc/piano/">here</a>) can be installed from bioconductor, enabling ontology enrichment analysis on gene sets.
 
 The function for fisher exact test calculation used within GOparallel is derived from a similar function in the piano package, with its dependencies, but further calculates the p values of both enrichment and depletion so that we have signed Zscores available.
