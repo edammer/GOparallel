@@ -919,7 +919,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 		if (length(tmp[,2]) == 0 | length(filter.minHits.idx) == 0)  { frame(); next; }
 		#tmp = tmp[filter.minHits.idx,c(11,10,9,1, 8)] ## Select GO-terms,GO-Type,Z-score,pValues (and previously/again, semicolon-separated gene Lists(8))
                 tmp2 <- tmp[filter.minHits.idx, c("ontology","ontologyType","Zscore","Pvalue.Enrichment","Genes.Hit")]
-		tmp2 = tmp2[order(tmp$Zscore,decreasing=T),]
+		tmp2 = tmp2[order(tmp2$Zscore,decreasing=T),]
 		tmp2 = tmp2[order(tmp2$ontologyType,decreasing=T),]
 	
 		if(identical(removeRedundantGOterms, "kappa")) { 
