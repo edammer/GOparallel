@@ -246,10 +246,10 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	  # ls(dexComps)   # list elements are dataframes with the DEX entries for that comparison
 
 
-	  ANOVAout$Symbol <- suppressWarnings("rbind", strsplit(as.character(rownames(ANOVAout)), "[|]"))[, 1])
+	  ANOVAout$Symbol <- suppressWarnings(do.call("rbind", strsplit(as.character(rownames(ANOVAout)), "[|]"))[, 1])
 	  if(length(which(grepl(";",ANOVAout$Symbol)))>0) {
 	    cat("- *Found some gene symbols have semicolons! Splitting these and keeping only symbol *before* semicolon.\n")
-	    ANOVAout$Symbol<-suppressWarnings("rbind",strsplit(as.character(ANOVAout$Symbol), "[;]"))[,1])
+	    ANOVAout$Symbol<-suppressWarnings(do.call("rbind",strsplit(as.character(ANOVAout$Symbol), "[;]"))[,1])
 	  }
 
 	  cat("\n")
@@ -337,10 +337,10 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    
 	    #Split out symbols from UniprotIDs, keep symbols in column 1
 	    rownames(modulesData)<-modulesData$Unique.ID
-	    modulesData$Unique.ID<-suppressWarnings("rbind",strsplit(as.character(modulesData$Unique.ID), "[|]"))[,1])
+	    modulesData$Unique.ID<-suppressWarnings(do.call("rbind",strsplit(as.character(modulesData$Unique.ID), "[|]"))[,1])
 	    if(length(which(grepl(";",modulesData$Unique.ID)))>0) {
 	      cat("- *Found some gene symbols have semicolons! Splitting these and keeping only symbol *before* semicolon.\n")
-	      modulesData$Unique.ID<-suppressWarnings("rbind",strsplit(as.character(modulesData$Unique.ID), "[;]"))[,1])
+	      modulesData$Unique.ID<-suppressWarnings(do.call("rbind",strsplit(as.character(modulesData$Unique.ID), "[;]"))[,1])
 	    }
 	    
 	    ## Creating background file for GO Elite analysis
@@ -377,9 +377,9 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	    for (a in 1:nModules) {
 	      modulesData[[a]] <- unique(modulesData[[a]][modulesData[[a]] != ""])
 	      modulesData[[a]] <- modulesData[[a]][!is.na(modulesData[[a]])]
-	      modulesData[[a]] <- suppressWarnings("rbind",strsplit(as.character(modulesData[[a]]), "[|]"))[,1])
+	      modulesData[[a]] <- suppressWarnings(do.call("rbind",strsplit(as.character(modulesData[[a]]), "[|]"))[,1])
 	      if(length(which(grepl(";",modulesData[[a]])))>0) {
-	        modulesData[[a]]<-suppressWarnings("rbind",strsplit(as.character(modulesData[[a]]), "[;]"))[,1])
+	        modulesData[[a]]<-suppressWarnings(do.call("rbind",strsplit(as.character(modulesData[[a]]), "[;]"))[,1])
 	      }
 	    }
 	    if(semicolonsFound) cat("- *Found some gene symbols have semicolons! Splitting these and keeping only symbol *before* semicolon.\n")
@@ -561,7 +561,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 
         # Create list object that is identical to a GSC class object, just not of this class, since not loaded by the loadGSC() function in piano package.
         GSCfromGMT<-list()
-        GSCfromGMT[["addInfo"]]<-rbind, lapply(GMT.df, function(x) if(grepl("^PMC.*\\%PMC\\%",x[1])) { c(x[1],gsub("^(PMC.*)\\%PMC\\%.*$","\\1",x[1])) } else { x[c(1:2)] } ))
+        GSCfromGMT[["addInfo"]]<-do.call(rbind, lapply(GMT.df, function(x) if(grepl("^PMC.*\\%PMC\\%",x[1])) { c(x[1],gsub("^(PMC.*)\\%PMC\\%.*$","\\1",x[1])) } else { x[c(1:2)] } ))
         GSCfromGMT[["gsc"]]<-lapply(GMT.df, function(x) if(grepl("^PMC.*\\%PMC\\%",x[1])) { x[c(2:length(x))][!x[c(2:length(x))]==""] } else { x[c(3:length(x))][!x[c(3:length(x))]==""] })
         names(GSCfromGMT$gsc)<-GSCfromGMT$addInfo[,1]
         
@@ -605,8 +605,8 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
         stopCluster(clusterLocal)
 	
 	  # re-combine list elements from two outputs, over all uniquemodcolors
-	  GSA.FET.resTab.list           = list,lapply(GSA.FET.outlist,function(x){x[[1]]}))
-	  GSA.FET.genesByOntology.list  = list,lapply(GSA.FET.outlist,function(x){x[[2]]}))
+	  GSA.FET.resTab.list           = do.call(list,lapply(GSA.FET.outlist,function(x){x[[1]]}))
+	  GSA.FET.genesByOntology.list  = do.call(list,lapply(GSA.FET.outlist,function(x){x[[2]]}))
 	
 	  names(GSA.FET.resTab.list) <- names(GSA.FET.genesByOntology.list) <- uniquemodcolors
 	
@@ -827,7 +827,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
               stopifnot(nrow(cl_df) == nrow(sub))
               sub$cluster <- cl_df$cluster
           
-              reps <- rbind, lapply(split(seq_len(nrow(sub)), sub$cluster), function(jj) {
+              reps <- do.call(rbind, lapply(split(seq_len(nrow(sub)), sub$cluster), function(jj) {
                 block <- sub[jj, , drop = FALSE]
                 # choose: most significant (lowest p), then fewest genes, then highest Z, then alpha
                 o <- order(block$Pvalue.Enrichment, block$.n_genes, -block$Zscore, block$ontology, na.last = TRUE)
@@ -836,7 +836,7 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
               reps
             })
           
-            kept <- rbind, keep_blocks)
+            kept <- do.call(rbind, keep_blocks)
             kept <- kept[, c("ontology","ontologyType","Zscore","Pvalue.Enrichment","Genes.Hit")]
             rownames(kept) <- NULL
             kept
