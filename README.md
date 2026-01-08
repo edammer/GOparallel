@@ -39,6 +39,8 @@ Note the current analysis output samples in the above linked .zip use June 2022 
     4) Tab-separated .txt table of all lists' Enrichment Benjamini-Hochberg corrected FDR values.
     5) (optional) GO:Cellular Component ontologies with at least one highly significant list enrichment are coclustered
        in a heatmap of signed Zscores across all lists. Works well with WGCNA module input.                   (cocluster=TRUE)
+    6) GSEA-style bubble plots of enrichment significance and gene (coverage) ratio, one PDF for each input list
+                                                                                                              (bubble=TRUE)
 ##
 
 
@@ -48,7 +50,7 @@ Note the current analysis output samples in the above linked .zip use June 2022 
 ###################################################################################################################################
 ## One-Step GSA FET (R piano implementation) WITH USER PARAMETERS
 ##  - by Eric Dammer, Divya Nandakumar
-## Nicholas Seyfried Lab Bioinformatics - for the lab - 07/27/2022 version 1.03
+## Nicholas Seyfried Lab Bioinformatics - for the lab - 07/27/2022 version 1.04
 ###################################################################################################################################
 ## Preload WGCNA standard pipeline R ression's data to memory, if desired (example minimal RData given here)
 ## otherwise below code runs as a step late in the Seyfried systems biology pipeline,
@@ -130,6 +132,9 @@ GO.OBOfile<-"C:/BaderLabGO/go.obo"
 cocluster=TRUE
             #If TRUE, output PDF of signed Zscore coclustering on GO:cellular component terms (useful for WGCNA modules)
 
+bubble=TRUE
+           #if TRUE, GSEA style bubble plots for each input list's enriched ontologies for each of the 6 ontology types will be output to PDF
+
 ######################## END OF PARAMETER VARIABLES ###################################################################################
 
 source("GOparallel-FET.R")
@@ -138,10 +143,9 @@ GOparallel()  # parameters are set in global environment as above; if not set, t
 	      
 ```
 ## Other Notes
-Requires R packages: piano, WGCNA, curl, doParallel, rvest, ontologyIndex, igraph, NMF, stringr.
-The piano package (documentation <a href="https://rdrr.io/bioc/piano/">here</a>) can be installed from bioconductor, enabling ontology enrichment analysis on gene sets.
+Requires R packages: piano, WGCNA, curl, doParallel, rvest, ontologyIndex, igraph, NMF, stringr. Bubble plots also require ggplot2, dplyr, tibble, scales, grid, and gtable packages. The piano package (documentation <a href="https://rdrr.io/bioc/piano/">here</a>) can be installed from bioconductor, enabling ontology enrichment analysis on gene sets.
 
-The function for fisher exact test calculation used within GOparallel is derived from a similar function in the piano package, with its dependencies, but further calculates the p values of both enrichment and depletion so that we have signed Zscores available.
+The function for Fisher exact test calculation used within GOparallel is derived from a similar function in the piano package, with its dependencies, but further calculates the p values of both enrichment and depletion so that we have signed Zscores available.
 ##
 .GMT standard tab-separated format databases are downloaded after scraping available file links from http://download.baderlab.org/EM_Genesets/current_release/
 for any of the available species there. According to <a href="http://baderlab.org/GeneSets">the site's documentation</a>, the 3 core GO ontology types are updated monthly, and additional curated pathways are collected from various sources, e.g. the Molecular Signatures (MSig) C2 database, Reactome, wikipathways, etc., which are updated less regularly.
@@ -151,3 +155,33 @@ In interactive sessions run from an R console, needed ontology database download
 
 If GO redundant term removal is enabled, ontologyIndex package will be loaded and the full go.obo file downloaded from <a href="http://current.geneontology.org/ontology/go.obo">http://current.geneontology.org/ontology/go.obo</a> if not already present as specified in the GO.OBOfile variable.
 
+<b>Wrapper code for function GO.bubblePlot():</b>
+<BR>(if post-hoc on output Zscore txt file from GOparallel)
+```
+########## PARAMETER SECTION ###############
+ZinputFile="GSA-GO-FET_MEGATMT-Zscores.txt"
+GMTfile="./Human_GO_AllPathways_noPFOCR_with_GO_iea_March_01_2025_symbol.gmt"
+GO.OBOfile="./go.obo"
+removeRedundantGOterms=TRUE
+
+keep_ontology_types <- c("GOBP", "GOMF", "GOCC")  #, "REACTOME", "WikiPathways", "MSIGDB_C2") #, "MSIGDBHALLMARK" also useable, but not plotted in barplots by GOparallel()
+#ontology_to_color <- c("GOBP"="darkseagreen3", "GOMF"="lightsteelblue1", "GOCC"="lightpink4",
+#                       "REACTOME"="goldenrod", "WikiPathways"="darkorange", "MSIGDB_C2"="gold", "MSIGDBHALLMARK"="greenyellow")
+    # default colors are used if not specified. Vector element names are required.
+
+MAX_TERMS_PER_ONTOLOGY_TYPE <- 5
+max_label_width <- 50          # Define maximum character width for wrapping ontology labels (change conservatively from 50, if at all)
+#########################################
+
+source("GOparallel-FET.R")  # includes GO.bubblePlot() function
+
+GO.bubblePlot(ZinputFile=ZinputFile,
+              GMTfile=GMTfile,
+#              GO.OBOfile=GO.OBOfile,  # Will be downloaded if not specified or found in working directory.
+              removeRedundantGOterms=TRUE,
+              keep_ontology_types=keep_ontology_types,
+#              ontology_to_color=ontology_to_color,  # Default colors are automatic.
+              MAX_TERMS_PER_ONTOLOGY_TYPE=MAX_TERMS_PER_ONTOLOGY_TYPE,
+              max_label_width=max_label_width)
+
+```
