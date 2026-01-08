@@ -2,6 +2,8 @@
 ## One-Step GSA FET (R piano implementation) WITH USER PARAMETERS
 ##  - by Eric Dammer, Divya Nandakumar
 ## Nicholas Seyfried Lab Bioinformatics - for the lab -
+##   01/07/2026 version 1.4         -- New: GO.bubblePlot() function for post-processing to GSEA-style bubble plots
+##                                     from the Zscore GOparallel output; and added a GOparallel(..., bubble=TRUE) argument
 ##   08/20/2025 version 1.3         -- malloc warning/error for parallelization on some Macs fixed; added Cohen's kappa graph-based
 ##                                     pruning within ontology types with option removeRedundantGOterms="kappa"
 ##   03/07/2023 version 1.2         -- Outputs include semicolon-separated Genes.Hit goi[goi %in% gs] for each input list/gene set
@@ -235,9 +237,9 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 	      } else { 
 	        comparisonIDs[iter, ] <- as.vector(c(paste0("dexTargets.", gsub("^p ", "", colnames(ANOVAout)[i])), paste0(as.character(gsub("^(.*)[' '](.*)\\.(.*)$", "\\1 (\\2 in \\3 samples)", colnames(ANOVAout)[i+numComp])))))
 	      }
-	      dexComps[[comparisonIDs[iter, 1]]] <- ANOVAout
+	      dexComps[[comparisonIDs[iter, 1] ]] <- ANOVAout
 	      if (!is.na(match(i, flip))) {
-	        dexComps[[comparisonIDs[iter, 1]]][, i + numComp] <- -1 * as.numeric(dexComps[[comparisonIDs[iter, 1]]][, i + numComp])
+	        dexComps[[comparisonIDs[iter, 1] ]][, i + numComp] <- -1 * as.numeric(dexComps[[comparisonIDs[iter, 1] ]][, i + numComp])
 	        comparisonIDs[iter, 2] <- gsub("(*.*) vs (*.*)", "\\2 vs \\1", comparisonIDs[iter, 2]) # flip label "vs" in comParisonIDs$Comparison[iter]
 	      }
 	    }
@@ -1131,7 +1133,521 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
             } else { cat("- None or only one significant Cellular Component ontologies (rows) found. Skipping GOCC Cluster Heatmap output.\n\n") }  # end if(nrow(GSA.FET.GOCC.Zscore)>1)
           } # end if (cocluster) 
         } # end if(length(uniquemodcolors)<1)
-        
+
+	# Optional (if bubble=TRUE): save a GSEA-style bubble plot to a PDF file for each input list's enriched ontologies.
+	if (exists("bubble")) if (bubble) {
+          cat("- Plotting GSEA-style bubble plots...\n")
+          
+	  GO.bubblePlot(ZinputFile = paste0(filePath,outFilename,"/GSA-GO-FET_",outFilename,"-Zscores.txt"),
+	                GMTfile = if(file.exists(paste0("../", GMTdatabaseFile))) { paste0("../", GMTdatabaseFile) } else {
+	                 GMTdatabaseFile },  # direct full path to GMT required if not up one level in the folder structure from the working directory at the time GOparallel was called.
+	                GO.OBOfile = if(file.exists(paste0("../",GO.OBOfile))) paste0("../",GO.OBOfile),  # function will fallback to redownload if not found.
+	                keep_ontology_types = c("GOBP", "GOMF", "GOCC", "REACTOME", "WikiPathways", "MSIGDB_C2"),
+	                ontology_to_color = c("GOBP"=color[1], "GOMF"=color[2], "GOCC"=color[3], "REACTOME"=color[4], "WikiPathways"=color[5], "MSIGDB_C2"=color[6]),
+	                MAX_TERMS_PER_ONTOLOGY_TYPE = maxBarsPerOntology,
+	                max_label_width = 50)
+	}
+
         setwd(filePath)
 
+}
+
+
+## GSEA-style Bubble plot PDF output function - stand alone to run after GOparallel on Zscore txt output, or with bubble=TRUE argument within GOparallel()
+GO.bubblePlot <- function(ZinputFile=NULL, GMTfile=NULL, GO.OBOfile="./go.obo", removeRedundantGOterms=TRUE, 
+                          keep_ontology_types = c("GOBP", "GOMF", "GOCC"),
+                          ontology_to_color = c("GOBP"="darkseagreen3", "GOMF"="lightsteelblue1", "GOCC"="lightpink4", "REACTOME"="goldenrod", "WikiPathways"="darkorange", "MSIGDB_C2"="gold", "MSIGDBHALLMARK"="greenyellow"),
+                          MAX_TERMS_PER_ONTOLOGY_TYPE = 5,
+                          max_label_width = 50) {
+
+  # Load required libraries
+  suppressPackageStartupMessages(require(ggplot2,quietly=TRUE))
+  suppressPackageStartupMessages(require(dplyr,quietly=TRUE))
+  suppressPackageStartupMessages(require(tibble,quietly=TRUE))
+  suppressPackageStartupMessages(require(stringr,quietly=TRUE))
+  suppressPackageStartupMessages(require(scales,quietly=TRUE)) # For rescale function
+  suppressPackageStartupMessages(require(grid,quietly=TRUE)) # For grob manipulation - to take out one tick mark!
+  suppressPackageStartupMessages(require(gtable,quietly=TRUE))
+  
+  minHitsPerOntology <- 5        # Ontologies hit by fewer than this number of genes will not be plotted; 5 is hard coded into GOparallel function and required to get the same ontologies for the 3 ontology types output by GOparallel
+  keep_ontology_types <- intersect(keep_ontology_types, c("GOBP", "GOMF", "GOCC", "REACTOME", "WikiPathways", "MSIGDB_C2", "MSIGDBHALLMARK"))
+  if(length(keep_ontology_types)<1) stop("Error:  Argument 'keep_ontology_types' must specify one or more supported ontologies ('GOBP', 'GOMF', 'GOCC', 'REACTOME', 'WikiPathways', 'MSIGDB_C2', 'MSIGDBHALLMARK')")
+  
+  if (is.null(ZinputFile)) stop("Error:  No GOparallel Zscore txt file was specified as input.") 
+  if (!file.exists(ZinputFile)) stop("Error:  ZinputFile not found.")
+   
+  if (is.null(GMTfile)) stop("Error:  No GMT file (ontology database from Bader Lab website) specified. This file must be specified and match the version used to generate the ZinputFile.") 
+  if (!file.exists(GMTfile)) stop("Error:  GMT file (ontology database from Bader Lab website) not found. This file must be specified and match the version used to generate the ZinputFile.") 
+  
+  
+  # Check if removeRedundantGOterms is specified
+  if(!exists("removeRedundantGOterms")) {
+      cat("- removeRedundantGOterms not specified TRUE/FALSE. Removing them as the default, using go.obo and ontologyIndex package.\n")
+      removeRedundantGOterms <- TRUE
+  }
+  if(removeRedundantGOterms) {
+      if (!exists("GO.OBOfile")) GO.OBOfile <- "../go.obo"
+      if (!file.exists(GO.OBOfile)) {
+          suppressPackageStartupMessages(require(curl, quietly=TRUE))
+          OBOtargetPath <- gsub("(.*\\/).*$", "\\1", GO.OBOfile)
+          if (!dir.exists(OBOtargetPath)) dir.create(OBOtargetPath)
+          curr.dir <- getwd()
+          setwd(OBOtargetPath)
+          cat(paste0("- Downloading go.obo file for main GO term redundancy cleanup...\n...to location:  ", OBOtargetPath, "go.obo\n"))
+          curl_download(url="http://current.geneontology.org/ontology/go.obo", destfile="go.obo", quiet = TRUE, mode = "w")
+          setwd(curr.dir)
+          cat("GO.OBOfile set to downloaded file: ", paste0(OBOtargetPath, "go.obo"), "\n")
+          GO.OBOfile <- paste0(OBOtargetPath, "go.obo")
+      }
+  }
+  
+  if (removeRedundantGOterms) {
+      suppressPackageStartupMessages(require(ontologyIndex))
+      ontology.index <- get_OBO(file=GO.OBOfile, extract_tags="everything")
+  }
+  
+  # Read input files
+  df1 <- read.table(ZinputFile, header=TRUE, sep="\t", stringsAsFactors=FALSE, quote = "\"")
+  
+  # Ensure the second column is named "OntologyType"
+  colnames(df1)[2] <- "OntologyType"
+  
+  # Read GMT file
+  lines <- readLines(GMTfile)
+  df2_list <- strsplit(lines, "\t")
+  
+  # Parse the GMT file
+  df2_parsed <- lapply(df2_list, function(x) {
+      matches <- regmatches(x[1], regexec("^(.*)%(.+)%(.+)$", x[1]))
+      if (length(matches[[1]]) >= 4) {
+          OntologyType <- matches[[1]][3]
+          ontology <- matches[[1]][2]
+          term <- matches[[1]][4]
+      } else {
+          OntologyType <- NA
+          ontology <- NA
+          term <- NA
+      }
+      genes <- x[3:length(x)]
+      list(OntologyType=OntologyType, ontology=ontology, term=term, genes=genes)
+  })
+  
+  # Create data frame
+  df2_df <- tibble(
+      OntologyType = sapply(df2_parsed, function(x) x$OntologyType),
+      ontology = sapply(df2_parsed, function(x) stringr::str_to_title(x$ontology)),
+      term = sapply(df2_parsed, function(x) x$term),
+      genes = lapply(df2_parsed, function(x) x$genes)
+  )
+  
+  # Copy WP# pathway IDs to term column
+  df2_df$term[which(grepl("^WP\\d+",df2_df$OntologyType))]<-df2_df$OntologyType[which(grepl("^WP\\d+",df2_df$OntologyType))]
+  # Revert WP# to 'WikiPathways' in OntologyType
+  df2_df$OntologyType[which(grepl("^WP\\d+",df2_df$OntologyType))]<-"WikiPathways"
+  # Remove '%Wikipathways_YYYYMMDD' from terms
+  df2_df$ontology[which(df2_df$OntologyType=="WikiPathways")]<-gsub("%Wikipathways_\\d+$","",df2_df$ontology[which(df2_df$OntologyType=="WikiPathways")])
+  
+  
+  df2_df <- df2_df[df2_df$OntologyType %in% keep_ontology_types, ]
+  
+  # Get the column names of df1
+  colnames_df1 <- colnames(df1)
+  
+  # Identify Z score columns (excluding "ontology" and "OntologyType", and columns ending with "_Genes.Hit")
+  zscore_cols <- colnames_df1[!(colnames_df1 %in% c("ontology", "OntologyType")) & !grepl("_Genes\\.Hit$", colnames_df1)]
+  
+  # Identify Genes.Hit columns
+  genes_hit_cols <- paste0(zscore_cols, "_Genes.Hit")
+  
+  # Check that the Genes.Hit columns exist
+  if (!all(genes_hit_cols %in% colnames_df1)) {
+      stop("Some Genes.Hit columns corresponding to Z score columns are missing in input_file1.txt")
+  }
+  
+  # Loop over each Z score column
+  for (i in seq_along(zscore_cols)) {
+      zscore_col <- zscore_cols[i]
+      genes_hit_col <- genes_hit_cols[i]
+      plot_title <- zscore_col
+  
+      # Prepare the data
+      df_current <- df1[, c("ontology", "OntologyType", zscore_col, genes_hit_col)]
+      colnames(df_current) <- c("ontology", "OntologyType", "Zscore", "Genes.Hit")
+  
+      # Merge data frames
+      df_merged <- merge(df_current, df2_df, by=c("OntologyType", "ontology"))
+  
+      # Compute number of genes hit
+      df_merged$num_genes_hit <- sapply(df_merged$Genes.Hit, function(x) length(strsplit(x, ";")[[1]]))
+  
+      # Compute total number of genes in ontology
+      df_merged$num_genes_total <- sapply(df_merged$genes, length)
+  
+      # Compute gene ratio
+      df_merged$gene_ratio <- df_merged$num_genes_hit / df_merged$num_genes_total
+  
+      # Correct p-value calculation: one-tailed test using log.p to handle very small p-values
+      # Compute log p-value
+      log_pvalue <- pnorm(df_merged$Zscore, lower.tail = FALSE, log.p = TRUE)
+      # Compute -log10(p-value) directly from log_pvalue
+      df_merged$neg_log10_pvalue <- -log_pvalue / log(10)
+  
+      # Handle infinite values by setting a maximum threshold
+      max_neg_log10_pvalue <- 50  # Adjust this threshold as needed
+      df_merged$neg_log10_pvalue <- pmin(df_merged$neg_log10_pvalue, max_neg_log10_pvalue)
+  
+      # Ensure neg_log10_pvalue is at least 1.30
+      df_merged$neg_log10_pvalue <- pmax(df_merged$neg_log10_pvalue, 1.30)
+          
+      # Filter for Zscore > 1.96
+      minZ <- qnorm(0.05/2, lower.tail=FALSE)
+      df_filtered <- df_merged[df_merged$Zscore > minZ, ]
+  
+      # Filter for minHitsPerOntology
+      df_filtered <- df_filtered[df_filtered$num_genes_hit >= minHitsPerOntology, ]
+      
+      # Keep only specified OntologyTypes
+      df_filtered <- df_filtered[df_filtered$OntologyType %in% keep_ontology_types, ]
+      
+      # If no significant ontologies found, skip plotting
+      if (nrow(df_filtered) == 0) {
+          message(paste("No significant ontologies found for", zscore_col))
+          next
+      }
+      
+      if(removeRedundantGOterms) {
+          df_filtered.coreGO <- df_filtered[df_filtered$OntologyType %in% c("GOCC", "GOBP", "GOMF") & df_filtered$Zscore >= minZ, ]
+          go.minimal.terms <- minimal_set(ontology.index, terms=df_filtered.coreGO$term)
+          df_filtered.minimal.terms <- df_filtered.coreGO[df_filtered.coreGO$term %in% go.minimal.terms, ]
+  
+          df_filtered.noCoreGO <- df_filtered[!df_filtered$OntologyType %in% c("GOCC", "GOBP", "GOMF"), ]
+          df_filtered <- rbind(df_filtered.noCoreGO, df_filtered.minimal.terms)
+      }
+  
+      rename_map <- c(
+        "GOBP"           = "BP",
+        "GOMF"           = "MF",
+        "GOCC"           = "CC",
+        "REACTOME"       = "RE",
+        "WikiPathways"   = "WP",
+        "MSIGDB_C2"      = "MS",
+        "MSIGDBHALLMARK" = "HM"
+      )
+  
+      # Select top 5 (or fewer) ontologies per OntologyType
+      df_top <- df_filtered %>%
+        group_by(OntologyType) %>%
+        arrange(desc(Zscore), .by_group = TRUE) %>%
+        slice_head(n = MAX_TERMS_PER_ONTOLOGY_TYPE) %>%
+        ungroup() %>%
+        mutate(
+          OntologyType = as.character(OntologyType),
+          OntologyType = recode(
+            OntologyType,
+            !!!rename_map[keep_ontology_types]
+          ),
+          OntologyType = factor(OntologyType)   # optional
+        )
+  
+  
+      # Create ontology label
+      df_top$ontology_label <- df_top$ontology #paste(df_top$OntologyType, df_top$ontology, sep=": ")
+      
+      # Reorder the ontology types so that CC follows MF
+      df_top$OntologyType <- factor(df_top$OntologyType, levels = c(if ("GOBP" %in% keep_ontology_types) "BP",
+                                                                    if ("GOMF" %in% keep_ontology_types) "MF",
+                                                                    if ("GOCC" %in% keep_ontology_types) "CC",
+                                                                    if ("REACTOME" %in% keep_ontology_types) "RE",
+                                                                    if ("WikiPathways" %in% keep_ontology_types) "WP",
+                                                                    if ("MSIGDB_C2" %in% keep_ontology_types) "MS",
+                                                                    if ("MSIGDBHALLMARK" %in% keep_ontology_types) "HM"))
+  
+      # Order ontology_label factor levels after ordering OntologyType
+      df_top <- df_top %>%
+          arrange(OntologyType, desc(Zscore))
+      
+      # Handle duplicates in ontology labels if they exist
+      if(length(which(duplicated(df_top$ontology_label)))>0) df_top$ontology_label[which(duplicated(df_top$ontology_label))]<-paste0(".",df_top$ontology_label[which(duplicated(df_top$ontology_label))])
+      if(length(which(duplicated(df_top$ontology_label)))>0) df_top$ontology_label[which(duplicated(df_top$ontology_label))]<-paste0("..",df_top$ontology_label[which(duplicated(df_top$ontology_label))])
+      
+      df_top$ontology_label <- factor(df_top$ontology_label, levels=rev(unique(df_top$ontology_label)))
+      
+      # Map OntologyType to specified colors
+      ontology_colors <- c()
+      if ("GOBP" %in% keep_ontology_types) ontology_colors <- c(ontology_colors, BP = ontology_to_color[["GOBP"]])
+      if ("GOMF" %in% keep_ontology_types) ontology_colors <- c(ontology_colors, "MF" = ontology_to_color[["GOMF"]])
+      if ("GOCC" %in% keep_ontology_types) ontology_colors <- c(ontology_colors, "CC" = ontology_to_color[["GOCC"]])
+      if ("REACTOME" %in% keep_ontology_types) ontology_colors=c(ontology_colors, "RE" = ontology_to_color[["REACTOME"]])
+      if ("WikiPathways" %in% keep_ontology_types) ontology_colors=c(ontology_colors, "WP" = ontology_to_color[["WikiPathways"]])
+      if ("MSIGDB_C2" %in% keep_ontology_types) ontology_colors=c(ontology_colors, "MS" = ontology_to_color[["MSIGDB_C2"]])
+      if ("MSIGDBHALLMARK" %in% keep_ontology_types) ontology_colors=c(ontology_colors, "HM" = ontology_to_color[["MSIGDBHALLMARK"]])
+      
+      # Wrap the ontology labels
+      df_top$ontology_label <- stringr::str_wrap(df_top$ontology_label, width = max_label_width)
+      
+      # Order ontology_label factor levels (after wrapping)
+      df_top$ontology_label <- as.character(df_top$ontology_label)
+      df_top$ontology_label <- factor(df_top$ontology_label, levels = rev(unique(df_top$ontology_label)))
+      
+      dummy_label <- paste(rep("_", ceiling(max_label_width*0.85)), collapse = "")
+  
+      # Adjust the breaks for gene_ratio
+      min_gene_ratio <- min(df_top$gene_ratio)
+      max_gene_ratio <- max(df_top$gene_ratio)
+      
+      # Generate breaks for gene_ratio size scale
+      breaks_gene_ratio <- seq(min_gene_ratio, max_gene_ratio, length.out = 5)
+      breaks_gene_ratio <- unique(round(breaks_gene_ratio, digits = 4))  # Round to 4 decimals to avoid duplicates
+      
+      # Convert breaks to percentages with 1 decimal place
+      labels_gene_ratio <- sprintf("%.1f%%", breaks_gene_ratio * 100)
+  
+      # Create a dummy row
+      dummy_row <- df_top[1, ]  # Copy structure
+      dummy_row$OntologyType <- NA
+      dummy_row$ontology <- NA
+      dummy_row$Zscore <- NA
+      dummy_row$neg_log10_pvalue <- NA  #min(df_top$neg_log10_pvalue)
+      dummy_row$gene_ratio <- NA  #min(df_top$gene_ratio)
+      dummy_row$Genes.Hit <- NA
+      dummy_row$num_genes_hit <- NA
+      dummy_row$num_genes_total <- NA
+      dummy_row$genes <- NA
+      dummy_row$ontology_label <- dummy_label
+      dummy_row$y_position <- nrow(df_top)+1
+      dummy_row$txtColor="#FFFFFF00"
+      
+      df_top$y_position<-as.numeric(rownames(df_top))  #c(1:nrow(df_top))
+      df_top$txtColor<-"black"
+      
+      # Add the dummy row to df_top
+      df_top <- rbind(df_top, dummy_row)
+  #    df_top$OntologyType.label <- paste0(df_top$OntologyType,".",df_top$ontology_label)
+  #    df_top$OntologyType.label <- factor(df_top$OntologyType.label, levels=rev(unique(df_top$OntologyType.label)))
+      
+      # Create a named vector of labels, (the dummy label is set to a long set-length string)
+      y_labels <- setNames(as.character(df_top$ontology_label), df_top$ontology_label)
+      #y_labels[dummy_label] <- ""
+      
+      #all_black_last_white=c(rep("black",length(y_labels)-1),"#FFFFFF00")
+  
+      # Get plot height: 342 px = 4.75 in; 252 px = 15.6x;  1x=16.15px
+      this.plotHeight=4.75*(16.15*0.6 +(nrow(df_top)-1)*16.15 +90)/342
+      # Plot
+      pdf(paste0("bubblePlot_", zscore_col, ".pdf"), width=8.8, height=this.plotHeight, bg = "transparent")
+      
+      # Create the plot and store it in a variable
+      p <- ggplot(df_top, aes(x = neg_log10_pvalue, y = ontology_label, size = gene_ratio, fill = OntologyType)) +
+          geom_point(shape = 21, color = "black", stroke = 0.5) +
+          scale_size_continuous(
+              name = "Gene Ratio",
+              breaks = breaks_gene_ratio,
+              labels = labels_gene_ratio,
+              guide = guide_legend(override.aes = list(fill = "grey70", color = "black")),
+              range = c(3, 8)
+          ) +
+          scale_fill_manual(
+              values = ontology_colors,
+              guide = "none"
+          ) +
+          xlab(expression(bold(-log[10](italic(p))))) +
+          ylab("Ontology") +
+          scale_y_discrete(labels = y_labels) +
+  #        ggtitle(bquote(bold(.(plot_title)))) +
+          theme_bw(base_size = 14, base_family = "Helvetica") +
+          theme(
+              panel.background = element_rect(fill = "transparent", color = NA),
+              plot.background = element_rect(fill = "transparent", color = NA),
+              axis.text.y = element_text(size = 9.4, hjust = 1, vjust=0.5, colour=df_top$txtColor),
+              axis.title.y = element_blank(),
+  #            axis.ticks.length.y = c(rep(unit(3,"points"),nrow(df_top)-1),unit(0,"points")),
+              panel.grid.major.x = element_blank(),
+              panel.grid.minor = element_blank(),
+              panel.grid.major.y = element_line(color = "grey", linetype = 2, size = 0.25),
+              legend.background = element_rect(fill = "transparent", colour = NA),
+              legend.key = element_rect(fill = "transparent", colour = NA),
+              plot.margin = unit(c(1, 4, 1, 1), "lines"),  # Adjust left margin
+              panel.border = element_rect(fill = NA)
+          )
+      
+      # Compute x-axis limits: data range plus 5% on each extreme
+      x_min_data <- min(df_top$neg_log10_pvalue, na.rm = TRUE)
+      x_max_data <- max(df_top$neg_log10_pvalue, na.rm = TRUE)
+      x_range <- x_max_data - x_min_data
+      
+      # Handle the case when x_range is zero
+      if (x_range == 0) {
+          # Set a small range around the data point
+          x_min <- x_min_data - 1
+          x_max <- x_max_data + 1
+          x_range <- x_max - x_min
+          x_min_hbar <- x_min - 0.1
+      } else {
+          x_min <- x_min_data - 0.05 * x_range
+          x_max <- x_max_data + 0.05 * x_range
+          x_min_hbar <- x_min_data - (x_range * 0.05) * 2
+      }
+  
+      # Add coordinate limits and prevent clipping
+      p <- p + coord_cartesian(xlim = c(x_min, x_max), clip = "off")
+      
+      # Determine the position of the vertical bar outside the plot area
+      offset <- x_range * 0.055
+      bar_width <- x_range * 0.05 * 2
+      
+      # Ensure offset and bar_width have minimum values
+      offset <- max(offset, 0.1)
+      bar_width <- max(bar_width, 0.2)
+      
+      bar_xmin <- x_max + offset
+      bar_xmax <- bar_xmin + bar_width
+      text_x <- bar_xmin + (bar_xmax - bar_xmin) / 2
+      
+      # Create label data with y positions
+      df_top <- df_top %>%
+          mutate(y_position = as.numeric(ontology_label))  # concatenated Type.label ensures ontologies named identically across ontology types are uniquely numbered!
+      
+      # Get the total number of ontologies
+      total_terms <- length(unique(df_top$ontology_label))
+  
+      # Group labels by OntologyType to get y_min and y_max for each group
+      grouped_labels <- df_top %>%
+          group_by(OntologyType) %>%
+          summarise(
+              y_min = min(y_position) - 0.5,
+              y_max = max(y_position) + 0.5
+          ) %>%
+          arrange(y_min)
+      
+      # Adjust y_min and y_max to ensure bars are contiguous and cover the entire y-axis
+      grouped_labels$y_min[1] <- 0.5
+      grouped_labels$y_max[nrow(grouped_labels)] <- total_terms + 0.5
+      
+      if (nrow(grouped_labels) > 1) {
+          for (ii in 2:nrow(grouped_labels)) {
+              grouped_labels$y_min[ii] <- grouped_labels$y_max[ii - 1]
+          }
+      }
+      
+      # Determine the position of the vertical bar outside the plot area
+      offset <- x_range * 0.055
+      bar_xmin <- x_max + offset
+      bar_xmax <- bar_xmin + (x_range * 0.05) * 2
+      text_x <- bar_xmin + (bar_xmax - bar_xmin) / 2
+  
+      grouped_labels1<-grouped_labels
+      grouped_labels1[1,"y_min"]<-floor(grouped_labels1[1,"y_min"])
+      grouped_labels1[nrow(grouped_labels1),"y_max"]<-ceiling(grouped_labels1[nrow(grouped_labels1),"y_max"])
+  
+      title_box1<-grouped_labels1[nrow(grouped_labels1),]    
+      grouped_labels1<-grouped_labels1[-nrow(grouped_labels1),]    
+  
+      # Add geom_rect for the vertical bars
+      p <- p + geom_rect(
+          data = grouped_labels1,
+          aes(
+              xmin = bar_xmin,
+              xmax = bar_xmax,
+              ymin = y_min,
+              ymax = y_max,
+              fill = OntologyType
+          ),
+          color = "black",
+          size = 0.5,
+          inherit.aes = FALSE
+      )
+      
+      # Add geom_text for the vertical rotated bold text
+      p <- p + geom_text(
+          data = grouped_labels,
+          aes(
+              x = text_x,
+              y = (y_min + y_max) / 2,
+              label = gsub("GO", "", OntologyType)
+          ),
+          angle = 270,
+          fontface = "bold",
+          color = "black",
+          size = 4,
+          inherit.aes = FALSE
+      )
+  
+      # Add horizontal title bar
+      p <- p + geom_rect(
+          data = title_box1,
+          aes(
+              xmin = x_min_hbar,
+              xmax = bar_xmin,
+              ymin = y_min+(y_max-y_min)*0.1,
+              ymax = y_max,
+              fill = "grey50"
+          ),
+          color = "black",
+          size = 0,
+          inherit.aes = FALSE
+      )
+      # Add horizontal title bar at the top
+      title_bar_height <- 0.5  # Adjust as needed
+      title_y_min <- total_terms + 0.5
+      title_y_max <- title_y_min + title_bar_height
+      title_text1<-data.frame(plot_title=plot_title, x=x_min_hbar, y=max(df_top$y_position))
+      # Add geom_text for the plot title within the horizontal bar
+      p <- p + geom_text(
+          data=title_text1,
+          aes(
+              x = x,
+              y = y,
+              label = paste0("  ",plot_title)
+          ),
+          angle = 0,
+          fontface = "bold",
+          color = "white",
+          size = 5.2,
+          hjust = 0,
+          vjust = -0.1,
+          inherit.aes = FALSE
+      )
+  
+      
+      # Adjust the left margin to allocate fixed space for y-axis labels
+      p <- p + theme(
+          plot.margin = unit(c(1, 4, 1, 0.5), "lines"),  # Top, right, bottom, left
+          axis.text.y = element_text(size = 10, hjust = 1, vjust = 0.5)
+      )
+      
+  #    # Explicitly print the plot
+  #    print(p)
+      
+  # Build the ggplot object
+  g <- ggplot_build(p)
+  gt <- ggplot_gtable(g)
+  
+  # Find the index of the y-axis in the gtable layout
+  index <- which(gt$layout$name == "axis-l")
+  
+  # Extract the y-axis grob
+  axis.grob <- gt$grobs[[index]]
+  
+  ## Extract the ticks grob
+  ##ticks.grob <- axis.grob$children$axis$children[[which(axis.grob$children$axis$childrenOrder == "ticks")]]
+  #
+  ## Get the number of ticks
+  #n.ticks <- length(ticks.grob)
+  #
+  ## Set the length of the last tick to zero
+  #ticks.grob[n.ticks] <- 2 #ticks.grob$x0[n.ticks]
+  #
+  ## Assign the modified ticks.grob back to the axis.grob
+  #axis.grob$children$axis$grobs[[1]][[4]] <- ticks.grob
+  tick.parent.grob.idx<-which(sapply(axis.grob$children$axis$grobs, function(x) inherits(x, "polyline")))
+  tick.attr.idx<-which(sapply(axis.grob$children$axis$grobs[[1]], function(x) inherits(x, "gpar")))
+  axis.grob$children$axis$grobs[[tick.parent.grob.idx]][[tick.attr.idx]]$col <- c(rep(axis.grob$children$axis$grobs[[tick.parent.grob.idx]][[tick.attr.idx]]$col[1],nrow(df_top)-1),"transparent")
+  
+  # Assign the modified axis.grob back to the gtable
+  gt$grobs[[index]] <- axis.grob
+      
+  grid.draw(gt)
+      
+      dev.off()
+  }
 }
