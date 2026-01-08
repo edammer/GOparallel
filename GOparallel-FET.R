@@ -1136,12 +1136,12 @@ GOparallel <- function(dummyVar="",env=.GlobalEnv) {
 
 	# Optional (if bubble=TRUE): save a GSEA-style bubble plot to a PDF file for each input list's enriched ontologies.
 	if (exists("bubble")) if (bubble) {
-          cat("- Plotting GSEA-style bubble plots...\n")
+          cat("\nPlotting GSEA-style bubble plots...\n")
           
 	  GO.bubblePlot(ZinputFile = paste0(filePath,outFilename,"/GSA-GO-FET_",outFilename,"-Zscores.txt"),
 	                GMTfile = if(file.exists(paste0("../", GMTdatabaseFile))) { paste0("../", GMTdatabaseFile) } else {
 	                 GMTdatabaseFile },  # direct full path to GMT required if not up one level in the folder structure from the working directory at the time GOparallel was called.
-	                GO.OBOfile = if(file.exists(paste0("../",GO.OBOfile))) paste0("../",GO.OBOfile),  # function will fallback to redownload if not found.
+	                GO.OBOfile = if(file.exists(paste0(filePath,GO.OBOfile))) { paste0(filePath,GO.OBOfile) } else { GO.OBOfile },  # function will fallback to redownload if not found.
 	                keep_ontology_types = c("GOBP", "GOMF", "GOCC", "REACTOME", "WikiPathways", "MSIGDB_C2"),
 	                ontology_to_color = c("GOBP"=color[1], "GOMF"=color[2], "GOCC"=color[3], "REACTOME"=color[4], "WikiPathways"=color[5], "MSIGDB_C2"=color[6]),
 	                MAX_TERMS_PER_ONTOLOGY_TYPE = maxBarsPerOntology,
@@ -1186,16 +1186,17 @@ GO.bubblePlot <- function(ZinputFile=NULL, GMTfile=NULL, GO.OBOfile="./go.obo", 
       removeRedundantGOterms <- TRUE
   }
   if(removeRedundantGOterms) {
-      if (!exists("GO.OBOfile")) GO.OBOfile <- "../go.obo"
+      if (!exists("GO.OBOfile")) GO.OBOfile <- "go.obo"
       if (!file.exists(GO.OBOfile)) {
           suppressPackageStartupMessages(require(curl, quietly=TRUE))
-          OBOtargetPath <- gsub("(.*\\/).*$", "\\1", GO.OBOfile)
-          if (!dir.exists(OBOtargetPath)) dir.create(OBOtargetPath)
-          curr.dir <- getwd()
-          setwd(OBOtargetPath)
+           OBOtargetPath <- paste0(getwd(),"/")
+#          OBOtargetPath <- gsub("(.*\\/).*$", "\\1", GO.OBOfile)
+#          if (!dir.exists(OBOtargetPath)) dir.create(OBOtargetPath)
+#          curr.dir <- getwd()
+#          setwd(OBOtargetPath)
           cat(paste0("- Downloading go.obo file for main GO term redundancy cleanup...\n...to location:  ", OBOtargetPath, "go.obo\n"))
           curl_download(url="http://current.geneontology.org/ontology/go.obo", destfile="go.obo", quiet = TRUE, mode = "w")
-          setwd(curr.dir)
+#          setwd(curr.dir)
           cat("GO.OBOfile set to downloaded file: ", paste0(OBOtargetPath, "go.obo"), "\n")
           GO.OBOfile <- paste0(OBOtargetPath, "go.obo")
       }
